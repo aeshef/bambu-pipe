@@ -34,6 +34,11 @@ class SliceError(BambuPipeError):
         super().__init__("slice_failed", message, recoverable=True, suggestion=suggestion)
 
 
+class MeshProviderError(BambuPipeError):
+    def __init__(self, message: str, suggestion: str | None = None) -> None:
+        super().__init__("mesh_provider_error", message, recoverable=True, suggestion=suggestion)
+
+
 class PrinterError(BambuPipeError):
     def __init__(self, message: str, suggestion: str | None = None) -> None:
         super().__init__("printer_error", message, recoverable=True, suggestion=suggestion)

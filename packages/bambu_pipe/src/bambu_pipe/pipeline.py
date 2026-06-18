@@ -15,6 +15,10 @@ class BambuPipeline:
 
     Use this class from scripts, notebooks, or local adapters instead
     of importing orchestration internals directly.
+
+    Methods named `validate_*` and `slice_*` never upload files or start the
+    printer. Methods named `print_*` may upload and start a print after the
+    configured approval gates are satisfied.
     """
 
     def __init__(
@@ -27,6 +31,7 @@ class BambuPipeline:
 
     @classmethod
     def from_env(cls) -> BambuPipeline:
+        """Create a pipeline from `BAMBU_PIPE_*` environment/config settings."""
         return cls(load_settings())
 
     async def create_job(
@@ -39,6 +44,11 @@ class BambuPipeline:
         material: str | None = None,
         auto_approve: bool | None = None,
     ) -> PrintJob:
+        """Create a persisted job without running pipeline stages.
+
+        Use this when an adapter wants to create a job first and drive execution
+        or approval separately.
+        """
         return await self.orchestrator.create_job(
             mode=mode,
             prompt=prompt,
@@ -49,6 +59,11 @@ class BambuPipeline:
         )
 
     async def run_job(self, job_id: str) -> PrintJob:
+        """Resume a job through the configured pipeline.
+
+        Depending on job mode and approval policy, this may validate, generate,
+        slice, upload, and start a print.
+        """
         return await self.orchestrator.run_mesh_pipeline(job_id)
 
     async def validate_model(
@@ -58,6 +73,10 @@ class BambuPipeline:
         quality: str | None = None,
         material: str | None = None,
     ) -> ValidationReport:
+        """Validate a model and return a `ValidationReport`.
+
+        This is a dry-run helper: it never slices, uploads, or starts a print.
+        """
         job = await self.create_job(
             mode="mesh_only",
             model_path=model_path,
@@ -82,6 +101,11 @@ class BambuPipeline:
         quality: str | None = None,
         material: str | None = None,
     ) -> PrintJob:
+        """Validate and slice a model locally.
+
+        This is a dry-run helper: it writes local slice artifacts but never
+        uploads to the printer and never starts a print.
+        """
         job = await self.create_job(
             mode="mesh_only",
             model_path=model_path,
@@ -110,6 +134,11 @@ class BambuPipeline:
         material: str | None = None,
         auto_approve: bool | None = None,
     ) -> PrintJob:
+        """Run the mesh-only pipeline for an existing model.
+
+        This method can upload to the printer and start a print after approval
+        gates pass.
+        """
         job = await self.create_job(
             mode="mesh_only",
             model_path=model_path,
@@ -127,6 +156,11 @@ class BambuPipeline:
         material: str | None = None,
         auto_approve: bool | None = None,
     ) -> PrintJob:
+        """Generate a mesh from text and run the full print pipeline.
+
+        This method requires a configured mesh provider and can upload to the
+        printer and start a print after approval gates pass.
+        """
         job = await self.create_job(
             mode="text_full",
             prompt=prompt,

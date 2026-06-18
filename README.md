@@ -17,7 +17,7 @@ Bambu Lab A1.
 without a desktop slicer UI, cloud lock-in, hosted accounts, or fragile printer
 scripts.
 
-[Getting Started](#quick-start) · [Python API](#python-api) · [Docs](docs/architecture.md) · [Printer Setup](docs/printer-setup.md) · [Configuration](docs/configuration.md) · [Release Process](docs/release.md) · [Roadmap](PLAN.md) · [Security](SECURITY.md) · [Support](SUPPORT.md) · [Issues](https://github.com/aeshef/bambu-pipe/issues)
+[Getting Started](#quick-start) · [Python API](docs/python-api.md) · [Docs](docs/architecture.md) · [Printer Setup](docs/printer-setup.md) · [Configuration](docs/configuration.md) · [Tripo Smoke](docs/tripo-smoke.md) · [Release Process](docs/release.md) · [Roadmap](PLAN.md) · [Security](SECURITY.md) · [Support](SUPPORT.md) · [Issues](https://github.com/aeshef/bambu-pipe/issues)
 
 ## Why It Exists
 
@@ -188,8 +188,10 @@ non-A1 profile packs.
 ## Documentation
 
 - [Architecture](docs/architecture.md)
+- [Python API](docs/python-api.md)
 - [Configuration](docs/configuration.md)
 - [Printer setup](docs/printer-setup.md)
+- [Real Tripo smoke test](docs/tripo-smoke.md)
 - [REST API](docs/api.md)
 - [Profiles and materials](profiles/README.md)
 - [Roadmap](PLAN.md)
