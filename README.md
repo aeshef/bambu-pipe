@@ -1,44 +1,79 @@
 # bambu-pipe
 
-Headless pipeline from a 3D mesh to a printed object on a Bambu Lab A1.
+[![CI](https://github.com/aeshef/bambu-pipe/actions/workflows/ci.yml/badge.svg)](https://github.com/aeshef/bambu-pipe/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Printer](https://img.shields.io/badge/printer-Bambu%20Lab%20A1-orange.svg)](docs/printer-setup.md)
+[![Mode](https://img.shields.io/badge/mode-LAN%20Developer%20Mode-black.svg)](docs/printer-setup.md)
 
-**Scope in v0.1:** LAN-only Bambu Lab A1 flow — validate → slice → print, plus a
-pluggable text-to-3D generation stage for providers such as Tripo.
+Turn a mesh or text prompt into a validated, sliced, LAN-started print on a
+Bambu Lab A1.
 
-## Quick start
+`bambu-pipe` is a headless 3D printing pipeline for builders who want automation
+without a desktop slicer UI, cloud lock-in, or fragile printer scripts.
+
+## Why It Exists
+
+Most 3D printing workflows still stop at the boring parts: open a slicer, pick
+profiles, export a project file, upload it, start the job, check whether the
+printer accepted it, then repeat when something silently fails.
+
+`bambu-pipe` makes that flow programmable:
+
+```text
+text prompt or mesh -> validation -> OrcaSlicer -> preview metadata -> approval -> Bambu A1
+```
+
+## Highlights
+
+- Headless A1 LAN printing over FTPS and MQTT.
+- OrcaSlicer integration with profile registry driven by JSON, not Python mappings.
+- `mesh_only` jobs for existing STL/OBJ/3MF/GLB assets.
+- `text_full` jobs through a Tripo-compatible text-to-3D provider.
+- Print Confidence Score from validation checks.
+- Approval gates before slicing and printing.
+- REST API, CLI, Docker API service, and Telegram voice adapter.
+- SQLite job persistence for API mode.
+- Secret-safe REST uploads: no arbitrary server-local `model_path` from HTTP clients.
+- Open-source hygiene: CI, Dependabot, issue templates, docs, MIT license.
+
+## Quick Start
 
 ```bash
+git clone https://github.com/aeshef/bambu-pipe.git
+cd bambu-pipe
+
 python -m venv .venv
 source .venv/bin/activate
 pip install -e "packages/bambu_pipe[dev]"
+
 cp .env.example .env
-# edit .env with printer IP, serial, access code
+# Fill printer IP, serial, access code, and provider keys.
+
 bambu-pipe doctor
 ```
 
-Export OrcaSlicer profiles for your A1 into `profiles/bambu_a1/` and register
-materials in `profiles/bambu_a1/profiles.json` — see [profiles/README.md](profiles/README.md).
+For printer setup, see [`docs/printer-setup.md`](docs/printer-setup.md). For
+OrcaSlicer profiles and material registry details, see
+[`profiles/README.md`](profiles/README.md).
 
 ## CLI
 
 ```bash
-# Validate environment
+# Validate local setup.
 bambu-pipe doctor
 
-# Mesh-only pipeline (approval gates skipped with --yes)
-bambu-pipe print --model ./model.stl --yes
-
-# Choose any material key configured in profiles.json
+# Slice and start a local model.
 bambu-pipe print --model ./model.stl --material PETG --yes
 
-# Text-to-print pipeline through the configured Tripo-compatible provider
+# Generate a model from text, then validate, slice, approve, and print.
 bambu-pipe print "small low-poly cat figurine"
 
-# Printer status
+# Read printer state over LAN MQTT.
 bambu-pipe status
 ```
 
-## API
+## REST API
 
 ```bash
 pip install -e "packages/bambu_pipe[api]"
@@ -47,53 +82,97 @@ uvicorn apps.api.main:create_app --factory --reload --port 8080
 
 ```bash
 curl http://localhost:8080/api/v1/health
+
 curl -X POST "http://localhost:8080/api/v1/jobs/upload?auto_approve=true" \
   -F "file=@./model.stl"
+
 curl -X POST http://localhost:8080/api/v1/jobs/<id>/run
-curl -X POST http://localhost:8080/api/v1/jobs/<id>/approve -d '{"approved":true}'
+curl http://localhost:8080/api/v1/jobs/<id>/preview
+curl -X POST http://localhost:8080/api/v1/jobs/<id>/approve \
+  -H "Content-Type: application/json" \
+  -d '{"approved":true}'
 ```
 
-For one-shot REST printing, use `POST /api/v1/jobs/print` with the same multipart
-parameters as `/jobs/upload`. REST intentionally rejects arbitrary server-local
-paths; adapters that need local files should call the internal orchestrator API.
+One-shot upload-and-run is available through `POST /api/v1/jobs/print` with the
+same multipart parameters as `/jobs/upload`.
 
-Text-to-3D uses the Tripo-compatible provider by default. Set
-`BAMBU_PIPE_TRIPO_API_KEY=...`, then create a `text_full` job with a prompt.
+## Text-To-Print
+
+`text_full` uses the configured Tripo-compatible provider. Add the key to your
+local `.env`:
+
+```bash
+BAMBU_PIPE_MESH_PROVIDER=tripo
+BAMBU_PIPE_TRIPO_API_KEY=...
+```
+
+Then create a job through CLI or REST:
+
+```bash
+bambu-pipe print "desk toy robot, printable as a single object"
+```
 
 ## Docker
 
 ```bash
 cp .env.example .env
-# edit .env and profiles/bambu_a1/profiles.json
 docker compose -f docker/compose.yml up --build
 ```
 
-The API container expects printer LAN access and mounted Orca profiles. Local
-OrcaSlicer execution inside Docker requires mounting or installing the slicer
-binary in the container image.
+The API container needs LAN access to the printer and access to Orca profiles.
+If slicing inside the container, mount or install an OrcaSlicer binary.
 
 ## Architecture
 
-- `bambu_pipe.stages.*` — atomic pipeline stages with protocols
-- `bambu_pipe.printer.base.PrinterClient` — printer-provider contract
-- `bambu_pipe.models.validation.ValidationReport` — Print Confidence Score from validation checks
-- `bambu_pipe.orchestrator.PipelineOrchestrator` — resumable state machine with approval gates
-- `apps/api` — thin FastAPI adapter
+`bambu-pipe` follows a ports-and-adapters design:
 
-## Requirements
+- `bambu_pipe.orchestrator.PipelineOrchestrator` owns the state machine.
+- `bambu_pipe.stages.*` contains atomic generation, validation, slicing, and print stages.
+- `bambu_pipe.providers.*` contains replaceable mesh and slicer providers.
+- `bambu_pipe.printer.*` isolates FTPS, MQTT, payload construction, and status parsing.
+- `apps/api` and `packages/voice2bambu` stay thin and call the core pipeline.
 
-- Python 3.11+
-- OrcaSlicer installed locally
-- Bambu Lab printer on LAN with **Developer Mode** enabled
-- Exported Orca profiles for your printer
+See [`docs/architecture.md`](docs/architecture.md) for the compact system map.
 
-## Docs
+## Release Status
+
+v0.1 targets one reliable hardware path:
+
+- Bambu Lab A1.
+- LAN / Developer Mode.
+- OrcaSlicer profiles.
+- Mesh upload or Tripo-compatible text generation.
+- Approval-gated start over local printer transport.
+
+Not in scope: Bambu cloud mode, warranty support, filament quality problems, or
+non-A1 profile packs.
+
+## Documentation
 
 - [Architecture](docs/architecture.md)
 - [Configuration](docs/configuration.md)
 - [Printer setup](docs/printer-setup.md)
-- [API](docs/api.md)
+- [REST API](docs/api.md)
+- [Profiles and materials](profiles/README.md)
+- [Roadmap](PLAN.md)
+
+## Contributing
+
+Issues and PRs are welcome. Please include:
+
+- `bambu-pipe doctor` output with secrets removed.
+- Printer model and firmware version.
+- Material, profile, and AMS/external filament mode.
+- The exact command or API request that failed.
+
+Start with [`CONTRIBUTING.md`](CONTRIBUTING.md) and the PR template.
+
+## Contact
+
+- GitHub: [aeshef/bambu-pipe](https://github.com/aeshef/bambu-pipe)
+- Issues: [github.com/aeshef/bambu-pipe/issues](https://github.com/aeshef/bambu-pipe/issues)
 
 ## License
 
-MIT
+MIT. Bambu Lab is a trademark of its owner; this project is independent and not
+affiliated with Bambu Lab.
