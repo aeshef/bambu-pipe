@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     # Pipeline behaviour
     auto_approve: bool = False
     max_upload_mb: int = Field(default=64, ge=1)
+    max_estimated_print_minutes: int | None = Field(default=None, ge=1)
     staging_dir: Path = Field(default_factory=default_staging_dir)
     database_path: Path = Field(default_factory=default_database_path)
 

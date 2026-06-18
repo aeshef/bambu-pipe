@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from pydantic import Field, SecretStr
+import os
+
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -20,6 +22,32 @@ class VoiceSettings(BaseSettings):
     transcription_api_key: SecretStr | None = None
     transcription_base_url: str = "https://api.openai.com/v1"
     transcription_model: str = "whisper-1"
+    transcription_language: str | None = None
+
+    @model_validator(mode="after")
+    def _apply_legacy_asr_aliases(self) -> VoiceSettings:
+        """Accept common ASR env names without making them the public contract."""
+        if self.transcription_api_key is None:
+            api_key = os.getenv("OPENROUTER_API_KEY")
+            if api_key:
+                self.transcription_api_key = SecretStr(api_key)
+
+        if self.transcription_model == "whisper-1":
+            model = os.getenv("ASR_MODEL")
+            if model:
+                self.transcription_model = model
+
+        if self.transcription_base_url == "https://api.openai.com/v1":
+            base_url = os.getenv("ASR_BASE_URL")
+            if base_url:
+                self.transcription_base_url = base_url
+
+        if self.transcription_language is None:
+            language = os.getenv("ASR_LANGUAGE")
+            if language:
+                self.transcription_language = language
+
+        return self
 
     @property
     def configured(self) -> bool:

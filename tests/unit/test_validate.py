@@ -5,9 +5,11 @@ from unittest.mock import AsyncMock
 
 import pytest
 from bambu_pipe.config import Settings
+from bambu_pipe.models.errors import SliceError
 from bambu_pipe.models.job import JobStage, PrintJob
 from bambu_pipe.models.validation import ValidationCheck, ValidationReport
 from bambu_pipe.orchestrator import PipelineOrchestrator
+from bambu_pipe.stages.slice import DefaultSliceStage, _estimated_minutes
 from bambu_pipe.stages.validate import DefaultValidationStage
 
 
@@ -83,8 +85,6 @@ async def test_mesh_pipeline_full_with_mocks(tmp_settings: Settings) -> None:
 
 @pytest.mark.asyncio
 async def test_slice_stage_uses_job_quality_and_material(tmp_settings: Settings) -> None:
-    from bambu_pipe.stages.slice import DefaultSliceStage
-
     captured: dict[str, str] = {}
     cube = Path(__file__).resolve().parents[1] / "fixtures" / "cube.stl"
     job = PrintJob(model_path=str(cube), quality="fine", material="PETG")
@@ -104,3 +104,56 @@ async def test_slice_stage_uses_job_quality_and_material(tmp_settings: Settings)
     await DefaultSliceStage(slicer=FakeSlicer()).run(job, tmp_settings)  # type: ignore[arg-type]
 
     assert captured == {"quality": "fine", "material": "PETG"}
+
+
+def test_estimated_minutes_parses_orca_time_strings() -> None:
+    assert _estimated_minutes("19h 25m 8s") == pytest.approx(1165.133, rel=0.001)
+    assert _estimated_minutes("10m") == pytest.approx(10)
+    assert _estimated_minutes("01:30:00") == pytest.approx(90)
+
+
+@pytest.mark.asyncio
+async def test_slice_stage_rejects_overlong_estimate(tmp_settings: Settings) -> None:
+    from bambu_pipe.providers.slicer.base import SliceResult
+
+    tmp_settings.max_estimated_print_minutes = 240
+    cube = Path(__file__).resolve().parents[1] / "fixtures" / "cube.stl"
+    job = PrintJob(model_path=str(cube))
+    job.artifacts.model_path = str(cube)
+    job.advance(JobStage.SLICING)
+
+    class FakeSlicer:
+        async def slice(self, model_path, output_path, settings):  # noqa: ANN001
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_bytes(b"fake")
+            return SliceResult(output_path=output_path, estimated_print_time="19h 25m 8s")
+
+    with pytest.raises(SliceError) as exc_info:
+        await DefaultSliceStage(slicer=FakeSlicer()).run(job, tmp_settings)  # type: ignore[arg-type]
+
+    assert "Estimated print time is too long" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_slice_stage_allows_overlong_estimate_without_configured_limit(
+    tmp_settings: Settings,
+    tmp_path: Path,
+) -> None:
+    from bambu_pipe.providers.slicer.base import SliceResult
+
+    tmp_settings.max_estimated_print_minutes = None
+    cube = tmp_path / "cube.stl"
+    cube.write_text("solid cube\nendsolid cube\n", encoding="utf-8")
+    job = PrintJob(model_path=str(cube))
+    job.artifacts.model_path = str(cube)
+    job.advance(JobStage.SLICING)
+
+    class FakeSlicer:
+        async def slice(self, model_path, output_path, settings):  # noqa: ANN001
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_bytes(b"fake")
+            return SliceResult(output_path=output_path, estimated_print_time="19h 25m 8s")
+
+    await DefaultSliceStage(slicer=FakeSlicer()).run(job, tmp_settings)  # type: ignore[arg-type]
+
+    assert job.stage == JobStage.AWAITING_SLICE_APPROVAL

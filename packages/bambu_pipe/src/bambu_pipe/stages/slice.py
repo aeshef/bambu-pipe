@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from bambu_pipe.config import Settings
@@ -37,4 +38,54 @@ class DefaultSliceStage:
         job.artifacts.thumbnail_path = str(result.thumbnail_path) if result.thumbnail_path else None
         job.artifacts.estimated_print_time = result.estimated_print_time
         job.artifacts.estimated_filament_g = result.estimated_filament_g
+        _enforce_print_time_limit(job, settings)
         job.advance(JobStage.AWAITING_SLICE_APPROVAL)
+
+
+def _enforce_print_time_limit(job: PrintJob, settings: Settings) -> None:
+    limit = settings.max_estimated_print_minutes
+    if limit is None:
+        return
+    estimated = _estimated_minutes(job.artifacts.estimated_print_time)
+    if estimated is None or estimated <= limit:
+        return
+    raise SliceError(
+        f"Estimated print time is too long: {job.artifacts.estimated_print_time}",
+        suggestion=(
+            f"Current safety limit is {limit} minutes. Use a smaller model, lower detail, "
+            "or raise BAMBU_PIPE_MAX_ESTIMATED_PRINT_MINUTES intentionally."
+        ),
+    )
+
+
+def _estimated_minutes(value: str | None) -> float | None:
+    if not value:
+        return None
+    normalized = value.strip().lower()
+    if not normalized:
+        return None
+
+    total = 0.0
+    matched = False
+    for amount, unit in re.findall(r"(\d+(?:\.\d+)?)\s*([dhms])", normalized):
+        matched = True
+        number = float(amount)
+        if unit == "d":
+            total += number * 24 * 60
+        elif unit == "h":
+            total += number * 60
+        elif unit == "m":
+            total += number
+        elif unit == "s":
+            total += number / 60
+    if matched:
+        return total
+
+    clock_match = re.fullmatch(r"(?:(\d+):)?(\d+):(\d+)", normalized)
+    if clock_match:
+        hours = int(clock_match.group(1) or 0)
+        minutes = int(clock_match.group(2))
+        seconds = int(clock_match.group(3))
+        return hours * 60 + minutes + seconds / 60
+
+    return None

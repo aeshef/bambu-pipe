@@ -93,7 +93,7 @@ async def _transcribe_voice(update, settings: VoiceSettings) -> str:  # noqa: AN
         response = await client.post(
             f"{settings.transcription_base_url.rstrip('/')}/audio/transcriptions",
             headers={"Authorization": f"Bearer {settings.transcription_token}"},
-            data={"model": settings.transcription_model},
+            data=_transcription_data(settings),
             files={"file": ("voice.ogg", bytes(audio), "audio/ogg")},
         )
         response.raise_for_status()
@@ -101,3 +101,10 @@ async def _transcribe_voice(update, settings: VoiceSettings) -> str:  # noqa: AN
     if not isinstance(transcript, str) or not transcript.strip():
         raise RuntimeError("Transcription provider returned an empty transcript")
     return transcript.strip()
+
+
+def _transcription_data(settings: VoiceSettings) -> dict[str, str]:
+    data = {"model": settings.transcription_model}
+    if settings.transcription_language:
+        data["language"] = settings.transcription_language.split(",", 1)[0].strip()
+    return data

@@ -22,6 +22,7 @@ Important values:
 - `BAMBU_PIPE_USE_AMS`
 - `BAMBU_PIPE_AMS_SLOT`
 - `BAMBU_PIPE_MAX_UPLOAD_MB`
+- `BAMBU_PIPE_MAX_ESTIMATED_PRINT_MINUTES`
 - `BAMBU_PIPE_MESH_PROVIDER`
 - `BAMBU_PIPE_TRIPO_API_KEY`
 - `BAMBU_PIPE_TRIPO_BASE_URL`
@@ -34,6 +35,11 @@ Python code.
 instead of silently continuing without generation. Provider URLs are configurable so forks
 can point at compatible gateways without code changes.
 
+For a real provider test, see `docs/tripo-smoke.md`.
+
 REST upload size is controlled by `BAMBU_PIPE_MAX_UPLOAD_MB`. The API does not
 accept arbitrary `model_path` values from HTTP clients; local paths are reserved
 for trusted adapters and CLI/internal orchestration.
+
+`BAMBU_PIPE_MAX_ESTIMATED_PRINT_MINUTES` is optional and disabled by default. When
+set, it rejects slices that exceed the configured time budget before upload/print.
