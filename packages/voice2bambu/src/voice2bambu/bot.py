@@ -16,7 +16,8 @@ def require_configured(settings: VoiceSettings) -> None:
         return
     raise RuntimeError(
         "voice2bambu is not configured. Set VOICE2BAMBU_TELEGRAM_TOKEN, "
-        "VOICE2BAMBU_ALLOWED_USER_IDS, and VOICE2BAMBU_TRANSCRIPTION_API_KEY."
+        "VOICE2BAMBU_ALLOWED_USER_IDS, VOICE2BAMBU_BAMBU_PIPE_API_BASE_URL, "
+        "and VOICE2BAMBU_TRANSCRIPTION_API_KEY."
     )
 
 
@@ -65,10 +66,16 @@ def _is_allowed(update, settings: VoiceSettings) -> bool:  # noqa: ANN001
     return bool(user and user.id in settings.allowed_user_ids)
 
 
+def _api_base_url(settings: VoiceSettings) -> str:
+    if not settings.bambu_pipe_api_base_url:
+        raise RuntimeError("VOICE2BAMBU_BAMBU_PIPE_API_BASE_URL is required")
+    return settings.bambu_pipe_api_base_url.rstrip("/")
+
+
 async def _create_text_full_job(prompt: str, update, settings: VoiceSettings) -> None:  # noqa: ANN001
     async with httpx.AsyncClient(timeout=30) as client:
         response = await client.post(
-            f"{settings.bambu_pipe_api_base_url.rstrip('/')}/jobs",
+            f"{_api_base_url(settings)}/jobs",
             json={"mode": "text_full", "prompt": prompt, "auto_approve": False},
         )
         response.raise_for_status()

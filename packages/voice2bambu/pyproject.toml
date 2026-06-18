@@ -11,7 +11,7 @@ license = "MIT"
 requires-python = ">=3.11"
 authors = [{ name = "bambu-pipe contributors" }]
 dependencies = [
-    "bambu-pipe",
+    "bambu-pipe[api,tripo]",
     "httpx>=0.27",
     "pydantic-settings>=2.2",
     "python-telegram-bot>=21.0",

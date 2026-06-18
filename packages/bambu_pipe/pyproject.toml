@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "bambu-pipe"
 version = "0.1.0"
-description = "Headless mesh-to-print pipeline for Bambu Lab printers"
+description = "Local-first Python toolkit for Bambu Lab print automation"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
@@ -21,7 +21,6 @@ classifiers = [
 ]
 dependencies = [
     "aiosqlite>=0.20",
-    "httpx>=0.27",
     "paho-mqtt>=2.0",
     "platformdirs>=4.0",
     "pydantic>=2.5",
@@ -37,8 +36,14 @@ api = [
     "uvicorn[standard]>=0.27",
     "python-multipart>=0.0.9",
 ]
+tripo = [
+    "httpx>=0.27",
+]
+all = [
+    "bambu-pipe[api,tripo]",
+]
 dev = [
-    "bambu-pipe[api]",
+    "bambu-pipe[api,tripo]",
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
     "ruff>=0.4",

@@ -114,7 +114,7 @@ def print_model(
 
 @app.command("jobs")
 def jobs_list() -> None:
-    """List in-memory jobs (API server keeps its own store)."""
+    """List in-memory jobs (the local API adapter keeps its own store)."""
     settings = load_settings()
 
     async def _run() -> None:
@@ -132,6 +132,21 @@ def jobs_list() -> None:
         console.print(table)
 
     asyncio.run(_run())
+
+
+@app.command("serve")
+def serve(
+    host: str = typer.Option("127.0.0.1", "--host", help="Bind host for the local adapter"),
+    port: int = typer.Option(8080, "--port", help="Bind port for the local adapter"),
+    reload: bool = typer.Option(False, "--reload", help="Enable uvicorn reload"),
+) -> None:
+    """Run the optional local REST adapter."""
+    try:
+        import uvicorn
+    except ImportError as exc:
+        console.print('[red]Install API dependencies:[/red] pip install "bambu-pipe[api]"')
+        raise typer.Exit(code=1) from exc
+    uvicorn.run("bambu_pipe.api:create_app", factory=True, host=host, port=port, reload=reload)
 
 
 def main() -> None:

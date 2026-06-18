@@ -2,7 +2,8 @@
 
 `bambu-pipe` is a ports-and-adapters pipeline:
 
-- Adapters: CLI, REST API, and `voice2bambu`.
+- Public facade: `bambu_pipe.BambuPipeline`.
+- Adapters: CLI, optional local REST API, and `voice2bambu`.
 - Orchestrator: job state machine, approval gates, and printer queue.
 - Stages: generate, validate, slice, and print.
 - Providers: slicer, mesh generation, printer transport.

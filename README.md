@@ -9,8 +9,9 @@
 Turn a mesh or text prompt into a validated, sliced, LAN-started print on a
 Bambu Lab A1.
 
-`bambu-pipe` is a headless 3D printing pipeline for builders who want automation
-without a desktop slicer UI, cloud lock-in, or fragile printer scripts.
+`bambu-pipe` is a local-first Python toolkit for builders who want automation
+without a desktop slicer UI, cloud lock-in, hosted accounts, or fragile printer
+scripts.
 
 ## Why It Exists
 
@@ -32,7 +33,7 @@ text prompt or mesh -> validation -> OrcaSlicer -> preview metadata -> approval 
 - `text_full` jobs through a Tripo-compatible text-to-3D provider.
 - Print Confidence Score from validation checks.
 - Approval gates before slicing and printing.
-- REST API, CLI, Docker API service, and Telegram voice adapter.
+- Python API, CLI, optional local REST adapter, Docker local-adapter image, and Telegram voice adapter.
 - SQLite job persistence for API mode.
 - Secret-safe REST uploads: no arbitrary server-local `model_path` from HTTP clients.
 - Open-source hygiene: CI, Dependabot, issue templates, docs, MIT license.
@@ -45,7 +46,7 @@ cd bambu-pipe
 
 python -m venv .venv
 source .venv/bin/activate
-pip install -e "packages/bambu_pipe[dev]"
+pip install -e "packages/bambu_pipe[all]"
 
 cp .env.example .env
 # Fill printer IP, serial, access code, and provider keys.
@@ -73,22 +74,44 @@ bambu-pipe print "small low-poly cat figurine"
 bambu-pipe status
 ```
 
-## REST API
+## Python API
+
+```python
+import asyncio
+
+from bambu_pipe import BambuPipeline
+
+
+async def main() -> None:
+    pipeline = BambuPipeline.from_env()
+    await pipeline.print_model("model.stl", material="PETG", auto_approve=True)
+    await pipeline.print_prompt("small low-poly cat figurine")
+
+
+asyncio.run(main())
+```
+
+## Local REST Adapter
+
+The REST API is an optional local adapter for integrations. It is not a hosted
+service and should not be exposed directly to the public internet.
 
 ```bash
 pip install -e "packages/bambu_pipe[api]"
-uvicorn apps.api.main:create_app --factory --reload --port 8080
+bambu-pipe serve --host <local-adapter-host> --port 8080
 ```
 
 ```bash
-curl http://localhost:8080/api/v1/health
+export BAMBU_PIPE_API_BASE_URL="http://<local-adapter-host>:8080/api/v1"
 
-curl -X POST "http://localhost:8080/api/v1/jobs/upload?auto_approve=true" \
+curl "$BAMBU_PIPE_API_BASE_URL/health"
+
+curl -X POST "$BAMBU_PIPE_API_BASE_URL/jobs/upload?auto_approve=true" \
   -F "file=@./model.stl"
 
-curl -X POST http://localhost:8080/api/v1/jobs/<id>/run
-curl http://localhost:8080/api/v1/jobs/<id>/preview
-curl -X POST http://localhost:8080/api/v1/jobs/<id>/approve \
+curl -X POST "$BAMBU_PIPE_API_BASE_URL/jobs/<id>/run"
+curl "$BAMBU_PIPE_API_BASE_URL/jobs/<id>/preview"
+curl -X POST "$BAMBU_PIPE_API_BASE_URL/jobs/<id>/approve" \
   -H "Content-Type: application/json" \
   -d '{"approved":true}'
 ```
@@ -130,6 +153,7 @@ If slicing inside the container, mount or install an OrcaSlicer binary.
 - `bambu_pipe.stages.*` contains atomic generation, validation, slicing, and print stages.
 - `bambu_pipe.providers.*` contains replaceable mesh and slicer providers.
 - `bambu_pipe.printer.*` isolates FTPS, MQTT, payload construction, and status parsing.
+- Public Python code uses `bambu_pipe.BambuPipeline`.
 - `apps/api` and `packages/voice2bambu` stay thin and call the core pipeline.
 
 See [`docs/architecture.md`](docs/architecture.md) for the compact system map.

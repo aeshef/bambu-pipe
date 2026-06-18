@@ -3,6 +3,15 @@
 Configuration is loaded from CLI flags, `BAMBU_PIPE_*` environment variables,
 `.env` in the current directory, and the platform config file.
 
+Install only the extras you need:
+
+```bash
+pip install "bambu-pipe"          # core library and CLI
+pip install "bambu-pipe[api]"     # optional local REST adapter
+pip install "bambu-pipe[tripo]"   # text-to-3D provider
+pip install "bambu-pipe[all]"     # common local toolkit install
+```
+
 Important values:
 
 - `BAMBU_PIPE_PRINTER_IP`

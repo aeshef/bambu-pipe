@@ -16,7 +16,7 @@ class VoiceSettings(BaseSettings):
 
     telegram_token: str | None = None
     allowed_user_ids: set[int] = Field(default_factory=set)
-    bambu_pipe_api_base_url: str = "http://127.0.0.1:8080/api/v1"
+    bambu_pipe_api_base_url: str | None = None
     transcription_api_key: SecretStr | None = None
     transcription_base_url: str = "https://api.openai.com/v1"
     transcription_model: str = "whisper-1"
@@ -26,6 +26,7 @@ class VoiceSettings(BaseSettings):
         return bool(
             self.telegram_token
             and self.allowed_user_ids
+            and self.bambu_pipe_api_base_url
             and self.transcription_api_key
             and self.transcription_api_key.get_secret_value()
         )

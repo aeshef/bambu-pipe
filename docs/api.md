@@ -1,6 +1,15 @@
-# REST API
+# Local REST API
 
 Base path: `/api/v1`.
+
+The REST API is an optional local adapter for integrations running near the
+printer. It is not designed as a hosted multi-tenant service.
+
+Run it with:
+
+```bash
+bambu-pipe serve --host <local-adapter-host> --port 8080
+```
 
 - `GET /health`
 - `GET /doctor`
@@ -21,7 +30,9 @@ For safety, REST `POST /jobs` does not accept arbitrary server-local
 ## Upload And Run
 
 ```bash
-curl -X POST "http://localhost:8080/api/v1/jobs/print?auto_approve=true&material=PETG" \
+export BAMBU_PIPE_API_BASE_URL="http://<local-adapter-host>:8080/api/v1"
+
+curl -X POST "$BAMBU_PIPE_API_BASE_URL/jobs/print?auto_approve=true&material=PETG" \
   -F "file=@./model.stl"
 ```
 
@@ -36,7 +47,7 @@ BAMBU_PIPE_TRIPO_API_KEY=...
 Then create and run a job:
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/jobs \
+curl -X POST "$BAMBU_PIPE_API_BASE_URL/jobs" \
   -H 'Content-Type: application/json' \
   -d '{"mode":"text_full","prompt":"small low-poly cat figurine","auto_approve":false}'
 ```
