@@ -20,6 +20,7 @@ from bambu_pipe.printer.status import (
 )
 
 START_HEALTHCHECK_SECONDS = 240
+RUNNING_STABLE_SECONDS = 120
 
 
 def publish_and_monitor_print_start(
@@ -93,29 +94,6 @@ def publish_and_monitor_print_start(
             client.disconnect()
             raise PrinterError(connect_error, suggestion="Enable Developer Mode on the printer")
         if connected and published:
-            if first_error_report is not None:
-                client.loop_stop()
-                client.disconnect()
-                print_error = print_report(first_error_report).get("print_error")
-                if print_error == EXTERNAL_FILAMENT_MISSING_ERROR_CODE:
-                    raise PrinterError(
-                        startup_failure_message(first_error_report),
-                        suggestion=(
-                            "The print was started in external/manual mode but filament was "
-                            "not fed into the PTFE path. Use AMS mode or feed external filament."
-                        ),
-                    )
-                raise PrinterError(
-                    startup_failure_message(first_error_report),
-                    suggestion="Printer reported a transient startup error before it was cleared.",
-                )
-            if first_failed_report is not None:
-                client.loop_stop()
-                client.disconnect()
-                raise PrinterError(
-                    startup_failure_message(first_failed_report),
-                    suggestion="Printer entered FAILED during startup monitoring.",
-                )
             if use_ams and has_filament_block(latest_report):
                 client.loop_stop()
                 client.disconnect()
@@ -126,7 +104,11 @@ def publish_and_monitor_print_start(
                         "the external/toolhead path; unload it before retrying."
                     ),
                 )
-            if stable_running_since and time.time() - stable_running_since >= 120:
+            running_long_enough = (
+                stable_running_since
+                and time.time() - stable_running_since >= RUNNING_STABLE_SECONDS
+            )
+            if running_long_enough:
                 client.loop_stop()
                 client.disconnect()
                 return
@@ -140,6 +122,23 @@ def publish_and_monitor_print_start(
     if not published:
         raise PrinterError("Timed out waiting for MQTT connection")
     if not saw_running:
+        failed_report = first_failed_report or first_error_report
+        if failed_report is not None:
+            print_error = print_report(failed_report).get("print_error")
+            if print_error == EXTERNAL_FILAMENT_MISSING_ERROR_CODE:
+                raise PrinterError(
+                    startup_failure_message(failed_report),
+                    suggestion=(
+                        "The print was started in external/manual mode but filament was "
+                        "not fed into the PTFE path. Use AMS mode or feed external filament."
+                    ),
+                )
+            raise PrinterError(
+                startup_failure_message(failed_report),
+                suggestion=(
+                    "Printer reported an error and never reached RUNNING during startup monitoring."
+                ),
+            )
         raise PrinterError(
             "Printer did not report RUNNING after project_file command",
             suggestion=f"Last report: {print_report(latest_report)}",
