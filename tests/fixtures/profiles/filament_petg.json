@@ -1,0 +1,27 @@
+{
+    "type": "filament",
+    "name": "Bambu PETG HF @BBL A1",
+    "inherits": "Bambu PETG HF @base",
+    "from": "system",
+    "setting_id": "GFSG02_03",
+    "instantiation": "true",
+    "filament_id": "GFG02",
+    "filament_type": [
+        "PETG"
+    ],
+    "nozzle_temperature": [
+        "240"
+    ],
+    "nozzle_temperature_initial_layer": [
+        "230"
+    ],
+    "textured_plate_temp": [
+        "70"
+    ],
+    "textured_plate_temp_initial_layer": [
+        "70"
+    ],
+    "compatible_printers": [
+        "Bambu Lab A1 0.4 nozzle"
+    ]
+}

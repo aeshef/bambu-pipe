@@ -1,0 +1,17 @@
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    env_file:
+      - ../.env
+    ports:
+      - "8080:8080"
+    volumes:
+      - ../profiles:/app/profiles:ro
+      - bambu_pipe_cache:/root/.cache/bambu-pipe
+    environment:
+      BAMBU_PIPE_PROFILES_DIR: /app/profiles/bambu_a1
+
+volumes:
+  bambu_pipe_cache:

@@ -1,0 +1,26 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install package
+        run: pip install -e "packages/bambu_pipe[dev]"
+      - name: Ruff
+        run: ruff check packages/bambu_pipe/src tests apps
+      - name: Ruff format
+        run: ruff format --check packages/bambu_pipe/src tests apps
+      - name: Pytest
+        run: pytest -q

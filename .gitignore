@@ -1,0 +1,60 @@
+# Local reference clones (not part of the project)
+.reference/
+
+# Secrets & local config
+.env
+.env.*
+!.env.example
+*.pem
+.secrets.json
+.token_cache.json
+.envrc
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+*.log
+
+# Runtime artifacts
+staging/
+output/
+cache/
+tmp_*/
+*.gcode
+*.gcode.3mf
+*.thumbnail.png
+*.thumbnail.jpg
+*.thumbnail.jpeg
+*.stl
+*.glb
+*.gltf
+*.3mf
+!tests/fixtures/**
+
+# Database
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+
+# IDE
+.cursor/
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Docker
+docker-compose.override.yml

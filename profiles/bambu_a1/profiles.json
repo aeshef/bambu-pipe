@@ -1,0 +1,12 @@
+{
+    "machine": "machine.json",
+    "processes": {
+        "draft": "process_draft.json",
+        "standard": "process_standard.json",
+        "fine": "process_fine.json"
+    },
+    "materials": {
+        "PLA": "filament_pla.json",
+        "PETG": "filament_petg.json"
+    }
+}
