@@ -1,10 +1,14 @@
 # bambu-pipe
 
 [![CI](https://github.com/aeshef/bambu-pipe/actions/workflows/ci.yml/badge.svg)](https://github.com/aeshef/bambu-pipe/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/aeshef/bambu-pipe?include_prereleases&label=release)](https://github.com/aeshef/bambu-pipe/releases)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Printer](https://img.shields.io/badge/printer-Bambu%20Lab%20A1-orange.svg)](docs/printer-setup.md)
 [![Mode](https://img.shields.io/badge/mode-LAN%20Developer%20Mode-black.svg)](docs/printer-setup.md)
+[![Local First](https://img.shields.io/badge/local--first-no%20cloud-black)](docs/architecture.md)
+
+![bambu-pipe logo](docs/assets/logo.svg)
 
 Turn a mesh or text prompt into a validated, sliced, LAN-started print on a
 Bambu Lab A1.
@@ -12,6 +16,8 @@ Bambu Lab A1.
 `bambu-pipe` is a local-first Python toolkit for builders who want automation
 without a desktop slicer UI, cloud lock-in, hosted accounts, or fragile printer
 scripts.
+
+[Getting Started](#quick-start) · [Python API](#python-api) · [Docs](docs/architecture.md) · [Printer Setup](docs/printer-setup.md) · [Configuration](docs/configuration.md) · [Release Process](docs/release.md) · [Roadmap](PLAN.md) · [Security](SECURITY.md) · [Support](SUPPORT.md) · [Issues](https://github.com/aeshef/bambu-pipe/issues)
 
 ## Why It Exists
 
@@ -182,6 +188,8 @@ non-A1 profile packs.
 - [Profiles and materials](profiles/README.md)
 - [Roadmap](PLAN.md)
 - [Release process](docs/release.md)
+- [Security policy](SECURITY.md)
+- [Support](SUPPORT.md)
 
 ## Contributing
 
