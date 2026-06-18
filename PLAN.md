@@ -63,6 +63,7 @@ Explicit non-goals:
   - `[all]`
 - Add integration examples for library usage.
 - Add release-process documentation and package build checks.
+- Add CLI dry-run commands for validation, slicing, and preview before physical print start.
 
 ## v0.2 - Packaging And Reliability
 

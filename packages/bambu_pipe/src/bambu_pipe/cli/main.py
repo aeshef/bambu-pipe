@@ -12,7 +12,9 @@ from rich.table import Table
 from bambu_pipe.config import Settings, load_settings
 from bambu_pipe.doctor import run_doctor
 from bambu_pipe.models.job import JobStage
+from bambu_pipe.models.validation import ValidationReport
 from bambu_pipe.orchestrator import PipelineOrchestrator
+from bambu_pipe.pipeline import BambuPipeline
 from bambu_pipe.printer.client import BambuPrinterClient
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
@@ -63,6 +65,107 @@ def status() -> None:
         raise typer.Exit(code=1) from exc
 
 
+def _apply_job_settings(settings: Settings, quality: str, material: str | None) -> Settings:
+    settings.quality = quality  # type: ignore[assignment]
+    if material is not None:
+        settings.material = material.upper()  # type: ignore[assignment]
+    return settings
+
+
+def _print_validation_report(report: ValidationReport) -> None:
+    table = Table(title="Validation")
+    table.add_column("Check")
+    table.add_column("Status")
+    table.add_column("Severity")
+    table.add_column("Message")
+    for check in report.checks:
+        table.add_row(
+            check.name,
+            "ok" if check.passed else "fail",
+            check.severity,
+            check.message,
+        )
+    console.print(table)
+    if report.score is not None:
+        console.print(f"Print Confidence Score: [bold]{report.score}%[/bold]")
+
+
+@app.command("validate")
+def validate_model(
+    model: Path = typer.Option(..., "--model", "-m", help="Path to STL/OBJ/GLB/3MF"),
+    quality: str = typer.Option("standard", "--quality", "-q"),
+    material: str | None = typer.Option(None, "--material"),
+) -> None:
+    """Validate a model without slicing or printing."""
+    settings = _apply_job_settings(load_settings(), quality, material)
+
+    async def _run() -> None:
+        report = await BambuPipeline(settings).validate_model(
+            model.resolve(),
+            quality=settings.quality,
+            material=settings.material,
+        )
+        _print_validation_report(report)
+        if not report.passed:
+            raise typer.Exit(code=2)
+
+    try:
+        asyncio.run(_run())
+    except typer.Exit:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        console.print(f"[red]Validation failed:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+
+@app.command("slice")
+def slice_model(
+    model: Path = typer.Option(..., "--model", "-m", help="Path to STL/OBJ/GLB/3MF"),
+    quality: str = typer.Option("standard", "--quality", "-q"),
+    material: str | None = typer.Option(None, "--material"),
+) -> None:
+    """Validate and slice a model without uploading or printing."""
+    settings = _apply_job_settings(load_settings(), quality, material)
+
+    async def _run() -> None:
+        job = await BambuPipeline(settings).slice_model(
+            model.resolve(),
+            quality=settings.quality,
+            material=settings.material,
+        )
+        if job.artifacts.validation:
+            _print_validation_report(job.artifacts.validation)
+        if job.stage == JobStage.FAILED:
+            console.print(f"[red]Slice skipped:[/red] {job.error or 'validation failed'}")
+            raise typer.Exit(code=2)
+        console.print(f"Sliced file: [bold]{job.artifacts.sliced_path}[/bold]")
+        if job.artifacts.thumbnail_path:
+            console.print(f"Thumbnail: [bold]{job.artifacts.thumbnail_path}[/bold]")
+        if job.artifacts.estimated_print_time:
+            console.print(f"Estimated time: [bold]{job.artifacts.estimated_print_time}[/bold]")
+        if job.artifacts.estimated_filament_g is not None:
+            filament = job.artifacts.estimated_filament_g
+            console.print(f"Estimated filament: [bold]{filament:.1f}g[/bold]")
+
+    try:
+        asyncio.run(_run())
+    except typer.Exit:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        console.print(f"[red]Slicing failed:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+
+@app.command("preview")
+def preview_model(
+    model: Path = typer.Option(..., "--model", "-m", help="Path to STL/OBJ/GLB/3MF"),
+    quality: str = typer.Option("standard", "--quality", "-q"),
+    material: str | None = typer.Option(None, "--material"),
+) -> None:
+    """Generate a local slice preview without uploading or printing."""
+    slice_model(model=model, quality=quality, material=material)
+
+
 @app.command("print")
 def print_model(
     prompt: str = typer.Argument("", help="Text prompt for text_full mode when --model is omitted"),
@@ -76,10 +179,7 @@ def print_model(
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip approval gates"),
 ) -> None:
     """Run mesh_only or text_full pipeline: generate/validate → slice → print."""
-    settings = _settings_ctx(auto_approve=yes)
-    settings.quality = quality  # type: ignore[assignment]
-    if material is not None:
-        settings.material = material.upper()  # type: ignore[assignment]
+    settings = _apply_job_settings(_settings_ctx(auto_approve=yes), quality, material)
 
     if model is None and not prompt:
         console.print("[red]Provide --model for mesh_only or a text prompt for text_full[/red]")

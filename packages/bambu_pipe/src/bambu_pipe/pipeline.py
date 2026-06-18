@@ -5,7 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from bambu_pipe.config import Settings, load_settings
-from bambu_pipe.models.job import PipelineMode, PrintJob
+from bambu_pipe.models.job import JobStage, PipelineMode, PrintJob
+from bambu_pipe.models.validation import ValidationReport
 from bambu_pipe.orchestrator import PipelineOrchestrator
 
 
@@ -49,6 +50,57 @@ class BambuPipeline:
 
     async def run_job(self, job_id: str) -> PrintJob:
         return await self.orchestrator.run_mesh_pipeline(job_id)
+
+    async def validate_model(
+        self,
+        model_path: str | Path,
+        *,
+        quality: str | None = None,
+        material: str | None = None,
+    ) -> ValidationReport:
+        job = await self.create_job(
+            mode="mesh_only",
+            model_path=model_path,
+            quality=quality,
+            material=material,
+            auto_approve=False,
+        )
+        job.advance(JobStage.VALIDATING)
+        report = await self.orchestrator.validation_stage.run(job, self.settings)
+        job.artifacts.validation = report
+        if report.passed:
+            job.advance(JobStage.AWAITING_VALIDATION_APPROVAL)
+        else:
+            job.advance(JobStage.FAILED, error=report.to_summary())
+        await self.orchestrator.store.save(job)
+        return report
+
+    async def slice_model(
+        self,
+        model_path: str | Path,
+        *,
+        quality: str | None = None,
+        material: str | None = None,
+    ) -> PrintJob:
+        job = await self.create_job(
+            mode="mesh_only",
+            model_path=model_path,
+            quality=quality,
+            material=material,
+            auto_approve=False,
+        )
+        job.advance(JobStage.VALIDATING)
+        report = await self.orchestrator.validation_stage.run(job, self.settings)
+        job.artifacts.validation = report
+        if not report.passed:
+            job.advance(JobStage.FAILED, error=report.to_summary())
+            await self.orchestrator.store.save(job)
+            return job
+        job.advance(JobStage.AWAITING_VALIDATION_APPROVAL)
+        job.advance(JobStage.SLICING)
+        await self.orchestrator.slice_stage.run(job, self.settings)
+        await self.orchestrator.store.save(job)
+        return job
 
     async def print_model(
         self,

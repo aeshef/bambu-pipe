@@ -70,6 +70,12 @@ OrcaSlicer profiles and material registry details, see
 # Validate local setup.
 bambu-pipe doctor
 
+# Check a model without slicing or touching the printer.
+bambu-pipe validate --model ./model.stl
+
+# Slice locally and inspect preview metadata without uploading.
+bambu-pipe preview --model ./model.stl --material PETG
+
 # Slice and start a local model.
 bambu-pipe print --model ./model.stl --material PETG --yes
 
