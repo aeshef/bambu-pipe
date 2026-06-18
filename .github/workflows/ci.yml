@@ -19,8 +19,10 @@ jobs:
       - name: Install package
         run: pip install -e "packages/bambu_pipe[dev]"
       - name: Ruff
-        run: ruff check packages/bambu_pipe/src tests apps
+        run: ruff check packages/bambu_pipe/src packages/voice2bambu/src tests apps examples
       - name: Ruff format
-        run: ruff format --check packages/bambu_pipe/src tests apps
+        run: ruff format --check packages/bambu_pipe/src packages/voice2bambu/src tests apps examples
       - name: Pytest
         run: pytest -q
+      - name: Build package
+        run: python -m build packages/bambu_pipe

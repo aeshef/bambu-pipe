@@ -91,6 +91,8 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
+More runnable snippets live in [`examples/`](examples/).
+
 ## Local REST Adapter
 
 The REST API is an optional local adapter for integrations. It is not a hosted
@@ -179,6 +181,7 @@ non-A1 profile packs.
 - [REST API](docs/api.md)
 - [Profiles and materials](profiles/README.md)
 - [Roadmap](PLAN.md)
+- [Release process](docs/release.md)
 
 ## Contributing
 

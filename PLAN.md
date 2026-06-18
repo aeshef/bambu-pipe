@@ -62,6 +62,7 @@ Explicit non-goals:
   - `[dev]`
   - `[all]`
 - Add integration examples for library usage.
+- Add release-process documentation and package build checks.
 
 ## v0.2 - Packaging And Reliability
 
