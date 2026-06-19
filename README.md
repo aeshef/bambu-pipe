@@ -17,7 +17,7 @@ Bambu Lab A1.
 without a desktop slicer UI, cloud lock-in, hosted accounts, or fragile printer
 scripts.
 
-[Getting Started](#quick-start) · [Python API](docs/python-api.md) · [Docs](docs/architecture.md) · [Printer Setup](docs/printer-setup.md) · [Configuration](docs/configuration.md) · [Tripo Smoke](docs/tripo-smoke.md) · [Release Process](docs/release.md) · [Roadmap](PLAN.md) · [Security](SECURITY.md) · [Support](SUPPORT.md) · [Issues](https://github.com/aeshef/bambu-pipe/issues)
+[Getting Started](#quick-start) · [Python API](docs/python-api.md) · [Docs](docs/architecture.md) · [Printer Setup](docs/printer-setup.md) · [Configuration](docs/configuration.md) · [Provider Contracts](docs/provider-contracts.md) · [Tripo Smoke](docs/tripo-smoke.md) · [Release Process](docs/release.md) · [Roadmap](PLAN.md) · [Security](SECURITY.md) · [Support](SUPPORT.md) · [Issues](https://github.com/aeshef/bambu-pipe/issues)
 
 ## Why It Exists
 
@@ -60,9 +60,9 @@ cp .env.example .env
 bambu-pipe doctor
 ```
 
-For printer setup, see [`docs/printer-setup.md`](docs/printer-setup.md). For
-OrcaSlicer profiles and material registry details, see
-[`profiles/README.md`](profiles/README.md).
+For printer setup, see [`docs/printer-setup.md`](docs/printer-setup.md). A
+default A1 profile pack is bundled for wheel installs; for custom OrcaSlicer
+profiles and material registry details, see [`profiles/README.md`](profiles/README.md).
 
 ## CLI
 
@@ -115,12 +115,16 @@ pip install -e "packages/bambu_pipe[api]"
 bambu-pipe serve --host <local-adapter-host> --port 8080
 ```
 
+Set `BAMBU_PIPE_API_TOKEN` before binding the adapter beyond loopback. Mutating
+requests then use `Authorization: Bearer <token>`.
+
 ```bash
 export BAMBU_PIPE_API_BASE_URL="http://<local-adapter-host>:8080/api/v1"
 
 curl "$BAMBU_PIPE_API_BASE_URL/health"
 
 curl -X POST "$BAMBU_PIPE_API_BASE_URL/jobs/upload?auto_approve=true" \
+  -H "Authorization: Bearer $BAMBU_PIPE_API_TOKEN" \
   -F "file=@./model.stl"
 
 curl -X POST "$BAMBU_PIPE_API_BASE_URL/jobs/<id>/run"
@@ -190,6 +194,7 @@ non-A1 profile packs.
 - [Architecture](docs/architecture.md)
 - [Python API](docs/python-api.md)
 - [Configuration](docs/configuration.md)
+- [Provider contracts](docs/provider-contracts.md)
 - [Printer setup](docs/printer-setup.md)
 - [Real Tripo smoke test](docs/tripo-smoke.md)
 - [REST API](docs/api.md)

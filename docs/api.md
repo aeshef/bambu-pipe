@@ -11,6 +11,22 @@ Run it with:
 bambu-pipe serve --host <local-adapter-host> --port 8080
 ```
 
+By default, `bambu-pipe serve` is safest on loopback. Binding beyond loopback
+without `BAMBU_PIPE_API_TOKEN` requires the explicit
+`--i-understand-local-network-risk` flag.
+
+When `BAMBU_PIPE_API_TOKEN` is set, mutating routes require either:
+
+```bash
+Authorization: Bearer <token>
+```
+
+or:
+
+```bash
+X-Bambu-Pipe-Token: <token>
+```
+
 - `GET /health`
 - `GET /doctor`
 - `GET /printer/status`
@@ -33,6 +49,7 @@ For safety, REST `POST /jobs` does not accept arbitrary server-local
 export BAMBU_PIPE_API_BASE_URL="http://<local-adapter-host>:8080/api/v1"
 
 curl -X POST "$BAMBU_PIPE_API_BASE_URL/jobs/print?auto_approve=true&material=PETG" \
+  -H "Authorization: Bearer $BAMBU_PIPE_API_TOKEN" \
   -F "file=@./model.stl"
 ```
 
@@ -48,6 +65,7 @@ Then create and run a job:
 
 ```bash
 curl -X POST "$BAMBU_PIPE_API_BASE_URL/jobs" \
+  -H "Authorization: Bearer $BAMBU_PIPE_API_TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"mode":"text_full","prompt":"small low-poly cat figurine","auto_approve":false}'
 ```

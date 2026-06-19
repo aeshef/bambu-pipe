@@ -11,6 +11,7 @@ dev-dependencies = []
 asyncio_mode = "auto"
 pythonpath = [
     "packages/bambu_pipe/src",
+    "packages/voice2bambu/src",
     ".",
 ]
 testpaths = ["tests"]
