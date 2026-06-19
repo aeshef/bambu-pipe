@@ -16,6 +16,7 @@ from bambu_pipe.models.validation import ValidationReport
 from bambu_pipe.orchestrator import PipelineOrchestrator
 from bambu_pipe.pipeline import BambuPipeline
 from bambu_pipe.printer.client import BambuPrinterClient
+from bambu_pipe.storage.sqlite import SQLiteJobStore
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 console = Console()
@@ -72,6 +73,14 @@ def _apply_job_settings(settings: Settings, quality: str, material: str | None) 
     return settings
 
 
+def _cli_orchestrator(settings: Settings) -> PipelineOrchestrator:
+    return PipelineOrchestrator(settings, store=SQLiteJobStore(settings.database_path))
+
+
+def _cli_pipeline(settings: Settings) -> BambuPipeline:
+    return BambuPipeline(settings=settings, orchestrator=_cli_orchestrator(settings))
+
+
 def _print_validation_report(report: ValidationReport) -> None:
     table = Table(title="Validation")
     table.add_column("Check")
@@ -100,7 +109,7 @@ def validate_model(
     settings = _apply_job_settings(load_settings(), quality, material)
 
     async def _run() -> None:
-        report = await BambuPipeline(settings).validate_model(
+        report = await _cli_pipeline(settings).validate_model(
             model.resolve(),
             quality=settings.quality,
             material=settings.material,
@@ -128,7 +137,7 @@ def slice_model(
     settings = _apply_job_settings(load_settings(), quality, material)
 
     async def _run() -> None:
-        job = await BambuPipeline(settings).slice_model(
+        job = await _cli_pipeline(settings).slice_model(
             model.resolve(),
             quality=settings.quality,
             material=settings.material,
@@ -190,7 +199,7 @@ def print_model(
             console.print(f"Checking printer LAN services at [bold]{settings.printer_ip}[/bold]...")
             await BambuPrinterClient().ensure_reachable(settings)
             console.print("[green]Printer LAN services are reachable[/green]")
-        orchestrator = PipelineOrchestrator(settings)
+        orchestrator = _cli_orchestrator(settings)
         job = await orchestrator.create_job(
             mode="mesh_only" if model else "text_full",
             model_path=str(model.resolve()) if model else None,
@@ -218,7 +227,7 @@ def jobs_list() -> None:
     settings = load_settings()
 
     async def _run() -> None:
-        orchestrator = PipelineOrchestrator(settings)
+        orchestrator = _cli_orchestrator(settings)
         rows = await orchestrator.list_jobs()
         if not rows:
             console.print("No jobs")
@@ -239,14 +248,33 @@ def serve(
     host: str = typer.Option("127.0.0.1", "--host", help="Bind host for the local adapter"),
     port: int = typer.Option(8080, "--port", help="Bind port for the local adapter"),
     reload: bool = typer.Option(False, "--reload", help="Enable uvicorn reload"),
+    unsafe_bind: bool = typer.Option(
+        False,
+        "--i-understand-local-network-risk",
+        help="Allow binding the unauthenticated local adapter beyond loopback",
+    ),
 ) -> None:
     """Run the optional local REST adapter."""
+    settings = load_settings()
+    if not _is_loopback_host(host) and not settings.secret(settings.api_token) and not unsafe_bind:
+        console.print(
+            "[red]Refusing to bind the local REST adapter beyond loopback without "
+            "BAMBU_PIPE_API_TOKEN.[/red]"
+        )
+        console.print(
+            "Set BAMBU_PIPE_API_TOKEN or pass --i-understand-local-network-risk explicitly."
+        )
+        raise typer.Exit(code=2)
     try:
         import uvicorn
     except ImportError as exc:
         console.print('[red]Install API dependencies:[/red] pip install "bambu-pipe[api]"')
         raise typer.Exit(code=1) from exc
     uvicorn.run("bambu_pipe.api:create_app", factory=True, host=host, port=port, reload=reload)
+
+
+def _is_loopback_host(host: str) -> bool:
+    return host in {"127.0.0.1", "::1", "localhost"}
 
 
 def main() -> None:

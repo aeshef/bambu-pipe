@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     staging_dir: Path = Field(default_factory=default_staging_dir)
     database_path: Path = Field(default_factory=default_database_path)
 
+    # Optional local REST adapter guard
+    api_token: SecretStr | None = None
+
     # Build volume for A1 (mm) — used by validation; scoring hooks use the same constants
     bed_width_mm: float = 256.0
     bed_depth_mm: float = 256.0

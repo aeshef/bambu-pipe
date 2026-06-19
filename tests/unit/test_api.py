@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from bambu_pipe.config import Settings
 from httpx import ASGITransport, AsyncClient
 
 from apps.api.main import create_app
@@ -17,7 +18,6 @@ def configure_test_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):  # noqa
     )
 
     app = create_app()
-    from bambu_pipe.config import Settings
     from bambu_pipe.orchestrator import PipelineOrchestrator
 
     app.state.settings = Settings()
@@ -236,3 +236,42 @@ async def test_upload_job_endpoint_enforces_size_limit(
         )
 
     assert response.status_code == 413
+
+
+@pytest.mark.asyncio
+async def test_mutating_api_requires_token_when_configured(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app = configure_test_app(tmp_path, monkeypatch)
+    app.state.settings = Settings(api_token="test-token")
+    transport = ASGITransport(app=app)
+
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/api/v1/jobs",
+            json={"mode": "text_full", "prompt": "small cube"},
+        )
+
+    assert response.status_code == 401
+    assert "BAMBU_PIPE_API_TOKEN" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_mutating_api_accepts_bearer_token(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app = configure_test_app(tmp_path, monkeypatch)
+    app.state.settings = Settings(api_token="test-token")
+    transport = ASGITransport(app=app)
+
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/api/v1/jobs",
+            headers={"Authorization": "Bearer test-token"},
+            json={"mode": "text_full", "prompt": "small cube"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["mode"] == "text_full"

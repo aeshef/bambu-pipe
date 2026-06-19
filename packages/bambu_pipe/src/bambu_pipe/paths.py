@@ -43,7 +43,7 @@ def default_database_path() -> Path:
 def bundled_profiles_dir() -> Path | None:
     """Return shipped Orca profile templates, if present in the package."""
     try:
-        root = resources.files("bambu_pipe").joinpath("profiles")
+        root = resources.files("bambu_pipe").joinpath("profiles", "bambu_a1")
         if root.is_dir():
             return Path(str(root))
     except (TypeError, FileNotFoundError):

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.2
+
+- Add optional token protection for mutating local REST API routes.
+- Refuse unsafe non-loopback REST binds unless an API token or explicit risk flag is configured.
+- Bundle default A1 Orca profile pack in the `bambu-pipe` wheel.
+- Expand CI to build `voice2bambu`, smoke-test wheel installs, scan for obvious secrets, and build Docker.
+- Make CLI job listing use the configured SQLite store.
+- Add provider/capability architecture docs for future device expansion.
+
 ## 0.1.1
 
 - Add public `BambuPipeline` helpers for model validation, local slicing, prompt printing, and job execution.

@@ -6,7 +6,7 @@ import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 
 from bambu_pipe import __version__
@@ -42,6 +42,32 @@ def get_settings(request: Request) -> Settings:
 
 def get_orchestrator(request: Request) -> PipelineOrchestrator:
     return request.app.state.orchestrator
+
+
+def require_api_token(
+    settings: Settings = Depends(get_settings),
+    authorization: str | None = Header(default=None),
+    x_bambu_pipe_token: str | None = Header(default=None),
+) -> None:
+    configured_token = settings.secret(settings.api_token)
+    if not configured_token:
+        return
+
+    bearer_prefix = "Bearer "
+    bearer_token = (
+        authorization[len(bearer_prefix) :]
+        if authorization and authorization.startswith(bearer_prefix)
+        else None
+    )
+    provided_token = bearer_token or x_bambu_pipe_token
+    if provided_token == configured_token:
+        return
+
+    raise HTTPException(
+        status_code=401,
+        detail="BAMBU_PIPE_API_TOKEN is required for mutating API requests",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
 
 
 def _serialize_job(job: PrintJob) -> dict[str, object]:
@@ -146,6 +172,7 @@ def _build_router() -> APIRouter:
     async def create_job(
         payload: JobCreateRequest,
         orchestrator: PipelineOrchestrator = Depends(get_orchestrator),
+        _token: None = Depends(require_api_token),
     ) -> dict[str, object]:
         if payload.model_path is not None:
             raise HTTPException(
@@ -176,6 +203,7 @@ def _build_router() -> APIRouter:
         auto_approve: bool = False,
         orchestrator: PipelineOrchestrator = Depends(get_orchestrator),
         settings: Settings = Depends(get_settings),
+        _token: None = Depends(require_api_token),
     ) -> dict[str, object]:
         job = await _create_upload_job(
             file=file,
@@ -195,6 +223,7 @@ def _build_router() -> APIRouter:
         auto_approve: bool = False,
         orchestrator: PipelineOrchestrator = Depends(get_orchestrator),
         settings: Settings = Depends(get_settings),
+        _token: None = Depends(require_api_token),
     ) -> dict[str, object]:
         job = await _create_upload_job(
             file=file,
@@ -252,6 +281,7 @@ def _build_router() -> APIRouter:
     async def run_job(
         job_id: str,
         orchestrator: PipelineOrchestrator = Depends(get_orchestrator),
+        _token: None = Depends(require_api_token),
     ) -> dict[str, object]:
         try:
             job = await orchestrator.run_mesh_pipeline(job_id)
@@ -266,6 +296,7 @@ def _build_router() -> APIRouter:
         job_id: str,
         payload: ApprovalRequest,
         orchestrator: PipelineOrchestrator = Depends(get_orchestrator),
+        _token: None = Depends(require_api_token),
     ) -> dict[str, object]:
         job = await orchestrator.get_job(job_id)
         if job is None:
@@ -293,6 +324,7 @@ def _build_router() -> APIRouter:
     async def cancel_job(
         job_id: str,
         orchestrator: PipelineOrchestrator = Depends(get_orchestrator),
+        _token: None = Depends(require_api_token),
     ) -> dict[str, object]:
         job = await orchestrator.cancel(job_id)
         return _serialize_job(job)

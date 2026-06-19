@@ -18,6 +18,7 @@ ruff check packages/bambu_pipe/src packages/voice2bambu/src apps tests examples
 ruff format --check packages/bambu_pipe/src packages/voice2bambu/src apps tests examples
 pytest -q
 python -m build packages/bambu_pipe
+python -m build packages/voice2bambu
 ```
 
 Push and open a PR:
@@ -41,14 +42,14 @@ For a patch release:
 1. Update versions in package metadata.
 2. Update `CHANGELOG.md`.
 3. Merge the release PR into `main`.
-4. Tag and push:
+4. Tag and push an annotated tag:
 
 ```bash
-git tag v0.1.1
-git push origin v0.1.1
+git tag -a v0.1.2 -m "bambu-pipe 0.1.2"
+git push origin v0.1.2
 ```
 
-1. Create a GitHub Release from the tag.
+5. Create a GitHub Release from the tag and include verification notes.
 
 ## Dependabot
 
