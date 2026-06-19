@@ -24,6 +24,7 @@ def test_jobs_command_reads_configured_sqlite_store(tmp_path, monkeypatch) -> No
     monkeypatch.setenv("BAMBU_PIPE_STAGING_DIR", str(tmp_path / "staging"))
 
     job = PrintJob(mode="text_full", prompt="small cube")
+    job.artifacts.model_path = str(tmp_path / "model.stl")
     asyncio.run(SQLiteJobStore(database_path).save(job))
 
     result = CliRunner().invoke(app, ["jobs"])
@@ -31,3 +32,11 @@ def test_jobs_command_reads_configured_sqlite_store(tmp_path, monkeypatch) -> No
     assert result.exit_code == 0
     assert job.id in result.output
     assert "pending" in result.output
+
+    show = CliRunner().invoke(app, ["jobs", "show", job.id])
+    assert show.exit_code == 0
+    assert job.id in show.output
+
+    artifacts = CliRunner().invoke(app, ["jobs", "artifacts", job.id, "--json"])
+    assert artifacts.exit_code == 0
+    assert "model_path" in artifacts.output

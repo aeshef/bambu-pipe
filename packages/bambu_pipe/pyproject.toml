@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "bambu-pipe"
-version = "0.1.2"
+version = "0.2.0"
 description = "Local-first Python toolkit for Bambu Lab print automation"
 readme = "README.md"
 license = "MIT"

@@ -17,7 +17,7 @@ Bambu Lab A1.
 without a desktop slicer UI, cloud lock-in, hosted accounts, or fragile printer
 scripts.
 
-[Getting Started](#quick-start) · [Python API](docs/python-api.md) · [Docs](docs/architecture.md) · [Printer Setup](docs/printer-setup.md) · [Configuration](docs/configuration.md) · [Provider Contracts](docs/provider-contracts.md) · [Tripo Smoke](docs/tripo-smoke.md) · [Release Process](docs/release.md) · [Roadmap](PLAN.md) · [Security](SECURITY.md) · [Support](SUPPORT.md) · [Issues](https://github.com/aeshef/bambu-pipe/issues)
+[Getting Started](#quick-start) · [Python API](docs/python-api.md) · [Docs](docs/architecture.md) · [Printer Setup](docs/printer-setup.md) · [Configuration](docs/configuration.md) · [Provider Contracts](docs/provider-contracts.md) · [PyPI Setup](docs/pypi-publish.md) · [Tripo Smoke](docs/tripo-smoke.md) · [Release Process](docs/release.md) · [Roadmap](PLAN.md) · [Security](SECURITY.md) · [Support](SUPPORT.md) · [Issues](https://github.com/aeshef/bambu-pipe/issues)
 
 ## Why It Exists
 
@@ -38,6 +38,7 @@ text prompt or mesh -> validation -> OrcaSlicer -> preview metadata -> approval 
 - `mesh_only` jobs for existing STL/OBJ/3MF/GLB assets.
 - `text_full` jobs through a Tripo-compatible text-to-3D provider.
 - Print Confidence Score from validation checks.
+- Dry-run print plans with preview HTML, thumbnail, estimates, and artifact manifest.
 - Approval gates before slicing and printing.
 - Python API, CLI, optional local REST adapter, Docker local-adapter image, and Telegram voice adapter.
 - SQLite job persistence for API mode.
@@ -76,6 +77,9 @@ bambu-pipe validate --model ./model.stl
 # Slice locally and inspect preview metadata without uploading.
 bambu-pipe preview --model ./model.stl --material PETG
 
+# Generate the full print plan without contacting the printer.
+bambu-pipe print "small low-poly cat figurine" --dry-run --material PLA
+
 # Slice and start a local model.
 bambu-pipe print --model ./model.stl --material PETG --yes
 
@@ -84,6 +88,11 @@ bambu-pipe print "small low-poly cat figurine"
 
 # Read printer state over LAN MQTT.
 bambu-pipe status
+
+# Inspect persisted local jobs.
+bambu-pipe jobs
+bambu-pipe jobs show <job-id>
+bambu-pipe jobs artifacts <job-id> --json
 ```
 
 ## Python API
@@ -195,6 +204,7 @@ non-A1 profile packs.
 - [Python API](docs/python-api.md)
 - [Configuration](docs/configuration.md)
 - [Provider contracts](docs/provider-contracts.md)
+- [PyPI publishing setup](docs/pypi-publish.md)
 - [Printer setup](docs/printer-setup.md)
 - [Real Tripo smoke test](docs/tripo-smoke.md)
 - [REST API](docs/api.md)

@@ -68,6 +68,11 @@ class StageArtifacts(BaseModel):
     remote_filename: str | None = None
     estimated_print_time: str | None = None
     estimated_filament_g: float | None = None
+    model_dimensions_mm: list[float] | None = None
+    preview_html_path: str | None = None
+    preview_image_path: str | None = None
+    artifact_manifest_path: str | None = None
+    provider_payload_paths: list[str] = Field(default_factory=list)
     print_progress_pct: float | None = None
 
 

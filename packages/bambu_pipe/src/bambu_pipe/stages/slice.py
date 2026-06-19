@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from bambu_pipe.artifacts import write_preview_artifacts
 from bambu_pipe.config import Settings
 from bambu_pipe.models.errors import SliceError
 from bambu_pipe.models.job import JobStage, PrintJob
@@ -40,6 +41,7 @@ class DefaultSliceStage:
         job.artifacts.estimated_filament_g = result.estimated_filament_g
         _enforce_print_time_limit(job, settings)
         job.advance(JobStage.AWAITING_SLICE_APPROVAL)
+        write_preview_artifacts(job, job_staging_dir(settings.staging_dir, job.id))
 
 
 def _enforce_print_time_limit(job: PrintJob, settings: Settings) -> None:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from pathlib import Path
 
 import typer
@@ -19,6 +20,12 @@ from bambu_pipe.printer.client import BambuPrinterClient
 from bambu_pipe.storage.sqlite import SQLiteJobStore
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
+jobs_app = typer.Typer(
+    invoke_without_command=True,
+    no_args_is_help=False,
+    add_completion=False,
+    help="Inspect persisted jobs",
+)
 console = Console()
 
 
@@ -99,6 +106,33 @@ def _print_validation_report(report: ValidationReport) -> None:
         console.print(f"Print Confidence Score: [bold]{report.score}%[/bold]")
 
 
+def _job_payload(job) -> dict[str, object]:  # noqa: ANN001
+    return job.model_dump(mode="json")
+
+
+def _print_json(payload: object) -> None:
+    console.print(json.dumps(payload, indent=2, sort_keys=True))
+
+
+def _print_plan_summary(job) -> None:  # noqa: ANN001
+    console.print(f"Job: [bold]{job.id}[/bold]")
+    console.print(f"Stage: [bold]{job.stage.value}[/bold]")
+    console.print(f"Material: [bold]{job.material}[/bold]  Quality: [bold]{job.quality}[/bold]")
+    if job.artifacts.model_dimensions_mm:
+        dims = " x ".join(f"{value:.1f}mm" for value in job.artifacts.model_dimensions_mm)
+        console.print(f"Dimensions: [bold]{dims}[/bold]")
+    if job.artifacts.estimated_print_time:
+        console.print(f"Estimated time: [bold]{job.artifacts.estimated_print_time}[/bold]")
+    if job.artifacts.estimated_filament_g is not None:
+        console.print(f"Estimated filament: [bold]{job.artifacts.estimated_filament_g:.1f}g[/bold]")
+    if job.artifacts.validation:
+        _print_validation_report(job.artifacts.validation)
+    if job.artifacts.preview_html_path:
+        console.print(f"Preview HTML: [bold]{job.artifacts.preview_html_path}[/bold]")
+    if job.artifacts.artifact_manifest_path:
+        console.print(f"Artifact manifest: [bold]{job.artifacts.artifact_manifest_path}[/bold]")
+
+
 @app.command("validate")
 def validate_model(
     model: Path = typer.Option(..., "--model", "-m", help="Path to STL/OBJ/GLB/3MF"),
@@ -170,9 +204,31 @@ def preview_model(
     model: Path = typer.Option(..., "--model", "-m", help="Path to STL/OBJ/GLB/3MF"),
     quality: str = typer.Option("standard", "--quality", "-q"),
     material: str | None = typer.Option(None, "--material"),
+    json_output: bool = typer.Option(False, "--json", help="Print machine-readable job JSON"),
 ) -> None:
     """Generate a local slice preview without uploading or printing."""
-    slice_model(model=model, quality=quality, material=material)
+    settings = _apply_job_settings(load_settings(), quality, material)
+
+    async def _run() -> None:
+        job = await _cli_pipeline(settings).slice_model(
+            model.resolve(),
+            quality=settings.quality,
+            material=settings.material,
+        )
+        if json_output:
+            _print_json(_job_payload(job))
+            return
+        _print_plan_summary(job)
+        if job.stage == JobStage.FAILED:
+            raise typer.Exit(code=2)
+
+    try:
+        asyncio.run(_run())
+    except typer.Exit:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        console.print(f"[red]Preview failed:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
 
 
 @app.command("print")
@@ -186,6 +242,8 @@ def print_model(
         help="Material key from profiles.json, e.g. PLA, PETG, TPU",
     ),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip approval gates"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Plan through slicing without printing"),
+    json_output: bool = typer.Option(False, "--json", help="Print machine-readable job JSON"),
 ) -> None:
     """Run mesh_only or text_full pipeline: generate/validate → slice → print."""
     settings = _apply_job_settings(_settings_ctx(auto_approve=yes), quality, material)
@@ -195,6 +253,23 @@ def print_model(
         raise typer.Exit(code=1)
 
     async def _run() -> None:
+        if dry_run:
+            job = await _cli_pipeline(settings).plan_print(
+                prompt=prompt,
+                model_path=model.resolve() if model else None,
+                quality=settings.quality,
+                material=settings.material,
+            )
+            if json_output:
+                _print_json(_job_payload(job))
+            else:
+                console.print(
+                    "[green]Dry-run print plan complete. Printer was not contacted.[/green]"
+                )
+                _print_plan_summary(job)
+            if job.stage == JobStage.FAILED:
+                raise typer.Exit(code=2)
+            return
         if settings.auto_approve:
             console.print(f"Checking printer LAN services at [bold]{settings.printer_ip}[/bold]...")
             await BambuPrinterClient().ensure_reachable(settings)
@@ -208,6 +283,9 @@ def print_model(
         )
         console.print(f"Created job [bold]{job.id}[/bold]")
         job = await orchestrator.run_mesh_pipeline(job.id)
+        if json_output:
+            _print_json(_job_payload(job))
+            return
         console.print(f"Job {job.id} finished in stage [bold]{job.stage.value}[/bold]")
         if job.stage == JobStage.DONE:
             console.print("[green]Print started successfully[/green]")
@@ -221,14 +299,22 @@ def print_model(
         raise typer.Exit(code=1) from exc
 
 
-@app.command("jobs")
-def jobs_list() -> None:
-    """List in-memory jobs (the local API adapter keeps its own store)."""
+@jobs_app.callback()
+def jobs_list(
+    ctx: typer.Context,
+    json_output: bool = typer.Option(False, "--json", help="Print machine-readable JSON"),
+) -> None:
+    """List persisted jobs from the configured SQLite store."""
+    if ctx.invoked_subcommand is not None:
+        return
     settings = load_settings()
 
     async def _run() -> None:
         orchestrator = _cli_orchestrator(settings)
         rows = await orchestrator.list_jobs()
+        if json_output:
+            _print_json([_job_payload(job) for job in rows])
+            return
         if not rows:
             console.print("No jobs")
             return
@@ -239,6 +325,93 @@ def jobs_list() -> None:
         for job in rows:
             table.add_row(job.id, job.stage.value, job.artifacts.model_path or "-")
         console.print(table)
+
+    asyncio.run(_run())
+
+
+@jobs_app.command("show")
+def jobs_show(
+    job_id: str,
+    json_output: bool = typer.Option(False, "--json", help="Print machine-readable JSON"),
+) -> None:
+    """Show a persisted job."""
+    settings = load_settings()
+
+    async def _run() -> None:
+        job = await _cli_orchestrator(settings).get_job(job_id)
+        if job is None:
+            console.print(f"[red]Unknown job:[/red] {job_id}")
+            raise typer.Exit(code=1)
+        if json_output:
+            _print_json(_job_payload(job))
+            return
+        _print_plan_summary(job)
+
+    asyncio.run(_run())
+
+
+@jobs_app.command("artifacts")
+def jobs_artifacts(
+    job_id: str,
+    json_output: bool = typer.Option(False, "--json", help="Print machine-readable JSON"),
+) -> None:
+    """Show job artifact paths."""
+    settings = load_settings()
+
+    async def _run() -> None:
+        job = await _cli_orchestrator(settings).get_job(job_id)
+        if job is None:
+            console.print(f"[red]Unknown job:[/red] {job_id}")
+            raise typer.Exit(code=1)
+        artifacts = {
+            key: value
+            for key, value in job.artifacts.model_dump(mode="json").items()
+            if value not in (None, [], {})
+        }
+        if json_output:
+            _print_json(artifacts)
+            return
+        table = Table(title=f"Artifacts for {job.id}")
+        table.add_column("Name")
+        table.add_column("Value")
+        for key, value in artifacts.items():
+            table.add_row(key, json.dumps(value) if isinstance(value, (dict, list)) else str(value))
+        console.print(table)
+
+    asyncio.run(_run())
+
+
+@jobs_app.command("retry")
+def jobs_retry(
+    job_id: str,
+    run: bool = typer.Option(False, "--run", help="Run the retried job immediately"),
+    json_output: bool = typer.Option(False, "--json", help="Print machine-readable JSON"),
+) -> None:
+    """Create a new job from an existing job's prompt or model artifact."""
+    settings = load_settings()
+
+    async def _run() -> None:
+        orchestrator = _cli_orchestrator(settings)
+        old = await orchestrator.get_job(job_id)
+        if old is None:
+            console.print(f"[red]Unknown job:[/red] {job_id}")
+            raise typer.Exit(code=1)
+        model_path = old.artifacts.model_path or old.model_path
+        new = await orchestrator.create_job(
+            mode=old.mode,
+            prompt=old.prompt,
+            model_path=model_path if old.mode == "mesh_only" else None,
+            quality=old.quality,
+            material=old.material,
+            auto_approve=False,
+        )
+        if run:
+            new = await orchestrator.run_mesh_pipeline(new.id)
+        if json_output:
+            _print_json(_job_payload(new))
+            return
+        console.print(f"Created retry job [bold]{new.id}[/bold] from [bold]{old.id}[/bold]")
+        console.print(f"Stage: [bold]{new.stage.value}[/bold]")
 
     asyncio.run(_run())
 
@@ -275,6 +448,9 @@ def serve(
 
 def _is_loopback_host(host: str) -> bool:
     return host in {"127.0.0.1", "::1", "localhost"}
+
+
+app.add_typer(jobs_app, name="jobs")
 
 
 def main() -> None:

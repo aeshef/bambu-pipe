@@ -51,6 +51,30 @@ asyncio.run(main())
 Guarantee: `slice_model()` writes local slice artifacts, but never uploads or
 starts a print.
 
+## Plan A Print Without Printing
+
+```python
+import asyncio
+
+from bambu_pipe import BambuPipeline
+
+
+async def main() -> None:
+    pipeline = BambuPipeline.from_env()
+    job = await pipeline.plan_print(
+        prompt="small low-poly cat figurine, printable as one object",
+        material="PLA",
+    )
+    print(job.artifacts.preview_html_path)
+    print(job.artifacts.artifact_manifest_path)
+
+
+asyncio.run(main())
+```
+
+Guarantee: `plan_print()` may generate and slice local artifacts, but never
+uploads to the printer and never starts a print.
+
 ## Print An Existing Model
 
 ```python
