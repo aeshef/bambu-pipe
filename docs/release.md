@@ -50,6 +50,8 @@ git push origin v0.1.2
 ```
 
 5. Create a GitHub Release from the tag and include verification notes.
+6. After Trusted Publishing is configured, GitHub Actions publishes to PyPI from
+   the release/tag workflow. See [`pypi-publish.md`](pypi-publish.md).
 
 ## Dependabot
 

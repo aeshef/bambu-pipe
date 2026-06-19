@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from pathlib import Path
 from urllib.parse import urljoin
 
@@ -31,8 +32,19 @@ class TripoMeshProvider:
         headers = {"Authorization": f"Bearer {self._api_key}"}
         try:
             async with httpx.AsyncClient(headers=headers, timeout=60) as client:
-                task_id = await self._create_task(client, request.prompt)
-                model_url = await self._wait_for_model_url(client, task_id)
+                payload_paths: list[Path] = []
+                task_id = await self._create_task(
+                    client,
+                    request.prompt,
+                    request.output_dir,
+                    payload_paths,
+                )
+                model_url = await self._wait_for_model_url(
+                    client,
+                    task_id,
+                    request.output_dir,
+                    payload_paths,
+                )
                 model_path = await self._download_model(client, model_url, request.output_dir)
         except httpx.TimeoutException as exc:
             raise MeshProviderError(
@@ -48,15 +60,23 @@ class TripoMeshProvider:
             model_path=model_path,
             provider="tripo",
             raw_prompt=request.prompt,
+            raw_payload_paths=tuple(payload_paths),
         )
 
-    async def _create_task(self, client: httpx.AsyncClient, prompt: str) -> str:
+    async def _create_task(
+        self,
+        client: httpx.AsyncClient,
+        prompt: str,
+        output_dir: Path,
+        payload_paths: list[Path],
+    ) -> str:
         response = await client.post(
             urljoin(self._base_url, "task"),
             json={"type": "text_to_model", "prompt": prompt},
         )
         _raise_for_status(response, "create Tripo task")
         payload = _json_payload(response, "create Tripo task")
+        payload_paths.append(_write_payload(output_dir, "tripo-create-task", payload))
         task_id = payload.get("data", {}).get("task_id") or payload.get("task_id")
         if not isinstance(task_id, str) or not task_id:
             raise MeshProviderError(
@@ -65,12 +85,21 @@ class TripoMeshProvider:
             )
         return task_id
 
-    async def _wait_for_model_url(self, client: httpx.AsyncClient, task_id: str) -> str:
+    async def _wait_for_model_url(
+        self,
+        client: httpx.AsyncClient,
+        task_id: str,
+        output_dir: Path,
+        payload_paths: list[Path],
+    ) -> str:
         deadline = asyncio.get_running_loop().time() + self._timeout_seconds
         while asyncio.get_running_loop().time() < deadline:
             response = await client.get(urljoin(self._base_url, f"task/{task_id}"))
             _raise_for_status(response, "poll Tripo task")
             payload = _json_payload(response, "poll Tripo task")
+            poll_path = _write_payload(output_dir, "tripo-poll-latest", payload)
+            if poll_path not in payload_paths:
+                payload_paths.append(poll_path)
             data = payload.get("data", payload)
             if not isinstance(data, dict):
                 raise MeshProviderError(
@@ -179,6 +208,13 @@ def _json_payload(response: httpx.Response, operation: str) -> dict[str, object]
             suggestion=f"Provider response: {payload}",
         )
     return payload
+
+
+def _write_payload(output_dir: Path, name: str, payload: dict[str, object]) -> Path:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    path = output_dir / f"{name}.json"
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    return path
 
 
 def _raise_for_status(response: httpx.Response, operation: str) -> None:

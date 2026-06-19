@@ -34,6 +34,7 @@ class DefaultGenerationStage:
         job.model_path = str(model_path)
         job.artifacts.model_path = str(model_path)
         job.artifacts.model_format = Path(model_path).suffix.lower().lstrip(".")
+        job.artifacts.provider_payload_paths = [str(path) for path in result.raw_payload_paths]
         job.advance(JobStage.AWAITING_MODEL_APPROVAL)
 
 

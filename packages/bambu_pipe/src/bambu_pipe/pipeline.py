@@ -126,6 +126,50 @@ class BambuPipeline:
         await self.orchestrator.store.save(job)
         return job
 
+    async def plan_print(
+        self,
+        *,
+        prompt: str = "",
+        model_path: str | Path | None = None,
+        quality: str | None = None,
+        material: str | None = None,
+    ) -> PrintJob:
+        """Prepare a full local print plan without uploading or starting the printer.
+
+        For `model_path`, this validates and slices the model. For `prompt`, this
+        also runs the configured mesh provider first. The returned job stops at
+        `awaiting_slice_approval` when planning succeeds.
+        """
+        mode: PipelineMode = "mesh_only" if model_path is not None else "text_full"
+        job = await self.create_job(
+            mode=mode,
+            prompt=prompt,
+            model_path=model_path,
+            quality=quality,
+            material=material,
+            auto_approve=False,
+        )
+        if mode == "text_full":
+            job.advance(JobStage.GENERATING)
+            await self.orchestrator.generation_stage.run(job, self.settings)
+            await self.orchestrator.store.save(job)
+            job.advance(JobStage.VALIDATING)
+        else:
+            job.advance(JobStage.VALIDATING)
+
+        report = await self.orchestrator.validation_stage.run(job, self.settings)
+        job.artifacts.validation = report
+        if not report.passed:
+            job.advance(JobStage.FAILED, error=report.to_summary())
+            await self.orchestrator.store.save(job)
+            return job
+
+        job.advance(JobStage.AWAITING_VALIDATION_APPROVAL)
+        job.advance(JobStage.SLICING)
+        await self.orchestrator.slice_stage.run(job, self.settings)
+        await self.orchestrator.store.save(job)
+        return job
+
     async def print_model(
         self,
         model_path: str | Path,

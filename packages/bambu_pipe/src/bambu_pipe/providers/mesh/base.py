@@ -19,6 +19,7 @@ class MeshGenerationResult:
     model_path: Path
     provider: str
     raw_prompt: str
+    raw_payload_paths: tuple[Path, ...] = ()
 
 
 class MeshProvider(Protocol):

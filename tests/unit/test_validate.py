@@ -9,6 +9,7 @@ from bambu_pipe.models.errors import SliceError
 from bambu_pipe.models.job import JobStage, PrintJob
 from bambu_pipe.models.validation import ValidationCheck, ValidationReport
 from bambu_pipe.orchestrator import PipelineOrchestrator
+from bambu_pipe.pipeline import BambuPipeline
 from bambu_pipe.stages.slice import DefaultSliceStage, _estimated_minutes
 from bambu_pipe.stages.validate import DefaultValidationStage
 
@@ -157,3 +158,37 @@ async def test_slice_stage_allows_overlong_estimate_without_configured_limit(
     await DefaultSliceStage(slicer=FakeSlicer()).run(job, tmp_settings)  # type: ignore[arg-type]
 
     assert job.stage == JobStage.AWAITING_SLICE_APPROVAL
+
+
+@pytest.mark.asyncio
+async def test_plan_print_stops_after_slice_and_writes_preview_artifacts(
+    tmp_settings: Settings,
+) -> None:
+    from bambu_pipe.providers.slicer.base import SliceResult
+
+    cube = Path(__file__).resolve().parents[1] / "fixtures" / "cube.stl"
+    orchestrator = PipelineOrchestrator(tmp_settings)
+
+    class FakeSlicer:
+        async def slice(self, model_path, output_path, settings):  # noqa: ANN001
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_bytes(b"fake")
+            thumbnail = output_path.with_suffix(".thumbnail.png")
+            thumbnail.write_bytes(b"png")
+            return SliceResult(
+                output_path=output_path,
+                thumbnail_path=thumbnail,
+                estimated_print_time="10m",
+                estimated_filament_g=4.2,
+            )
+
+    orchestrator.slice_stage = DefaultSliceStage(slicer=FakeSlicer())  # type: ignore[arg-type]
+
+    job = await BambuPipeline(tmp_settings, orchestrator).plan_print(model_path=cube)
+
+    assert job.stage == JobStage.AWAITING_SLICE_APPROVAL
+    assert job.artifacts.preview_html_path is not None
+    assert job.artifacts.artifact_manifest_path is not None
+    assert Path(job.artifacts.preview_html_path).is_file()
+    assert Path(job.artifacts.artifact_manifest_path).is_file()
+    assert job.artifacts.model_dimensions_mm is not None

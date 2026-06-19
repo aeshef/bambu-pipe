@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0
+
+- Add `bambu-pipe print --dry-run` to produce a complete local print plan without contacting the printer.
+- Generate `preview.html`, preview image copies, and `artifact-manifest.json` for sliced jobs.
+- Add validation warnings for tiny/huge scale, bed contact, overhang risk, and thin-feature risk.
+- Add `jobs show`, `jobs artifacts`, `jobs retry`, and JSON output for persisted job history.
+- Save Tripo provider create/poll payloads as job artifacts for debugging real text-to-3D runs.
+- Add `BambuPipeline.plan_print()` for scripts and adapters that need a no-print planning contract.
+
 ## 0.1.2
 
 - Add optional token protection for mutating local REST API routes.
