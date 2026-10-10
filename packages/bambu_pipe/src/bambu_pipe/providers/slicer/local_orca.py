@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import json
 import re
-import struct
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any
@@ -15,6 +14,7 @@ from bambu_pipe.config import Settings
 from bambu_pipe.models.errors import ConfigError, SliceError
 from bambu_pipe.providers.slicer.base import SliceResult
 from bambu_pipe.providers.slicer.discovery import discover_orca_slicer
+from bambu_pipe.providers.slicer.profiles import discover_resource_profiles, flatten_profiles
 
 DEFAULT_PROFILE_REGISTRY = "profiles.json"
 
@@ -166,45 +166,6 @@ def _fallback_filament_id(settings: dict[str, object], index: int) -> str:
     return "Generic"
 
 
-def _prescale_stl(stl_path: Path, scale: float) -> Path:
-    data = stl_path.read_bytes()
-    if len(data) < 84:
-        return stl_path
-    n_triangles = struct.unpack_from("<I", data, 80)[0]
-    expected = 84 + n_triangles * 50
-    if len(data) != expected:
-        return stl_path
-
-    out = bytearray(data)
-    for i in range(n_triangles):
-        base = 84 + i * 50
-        for j in range(3, 12):
-            offset = base + j * 4
-            val = struct.unpack_from("<f", out, offset)[0]
-            struct.pack_into("<f", out, offset, val * scale)
-
-    scaled = stl_path.with_stem(stl_path.stem + "_scaled")
-    scaled.write_bytes(bytes(out))
-    return scaled
-
-
-def _maybe_prescale_for_meters(model_path: Path) -> Path:
-    if model_path.suffix.lower() != ".stl":
-        return model_path
-    try:
-        import trimesh
-
-        mesh = trimesh.load(model_path, force="mesh", process=False)
-        if isinstance(mesh, trimesh.Scene):
-            mesh = trimesh.util.concatenate(tuple(mesh.geometry.values()))
-        size = mesh.bounds[1] - mesh.bounds[0]
-        if float(max(size)) < 10.0:
-            return _prescale_stl(model_path, 100.0)
-    except Exception:  # noqa: BLE001
-        return model_path
-    return model_path
-
-
 def _load_profile_registry(profiles_dir: Path) -> dict[str, Any]:
     registry_path = profiles_dir / DEFAULT_PROFILE_REGISTRY
     if not registry_path.is_file():
@@ -284,14 +245,18 @@ def _slice_sync(
     settings: Settings,
 ) -> SliceResult:
     machine, process, filament = _resolve_profile_files(settings)
-    input_path = _maybe_prescale_for_meters(model_path)
+    machine, process, filament = flatten_profiles(
+        (machine, process, filament),
+        resources=discover_resource_profiles(binary, settings.slicer_resource_profiles_dir),
+        output_dir=output_path.parent / "resolved-profiles",
+    )
 
     cmd = [
         str(binary),
         "--arrange",
         "1",
         "--orient",
-        "1",
+        "0",
         "--load-settings",
         f"{machine};{process}",
         "--load-filaments",
@@ -300,7 +265,7 @@ def _slice_sync(
         "0",
         "--export-3mf",
         str(output_path),
-        str(input_path),
+        str(model_path),
     ]
 
     proc = __import__("subprocess").run(
@@ -311,6 +276,14 @@ def _slice_sync(
         timeout=600,
     )
     combined = f"{proc.stdout}\n{proc.stderr}"
+    if proc.returncode < 0:
+        raise SliceError(
+            f"{binary.name} crashed with signal {-proc.returncode}; no slice was produced",
+            suggestion=(
+                "Use a working OrcaSlicer/Bambu Studio CLI via BAMBU_PIPE_SLICER_BINARY. "
+                "Some macOS Bambu Studio versions crash while initializing the plate in CLI mode."
+            ),
+        )
     if proc.returncode != 0:
         raise SliceError(
             f"OrcaSlicer failed (exit {proc.returncode}): {proc.stderr[:1000]}",

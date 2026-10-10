@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock
 
 import pytest
+import trimesh
 from bambu_pipe.config import Settings
 from bambu_pipe.models.errors import SliceError
 from bambu_pipe.models.job import JobStage, PrintJob
@@ -24,6 +25,40 @@ async def test_validation_passes_for_small_cube(tmp_settings: Settings) -> None:
     assert report.score == 100
     assert any(check.name == "bed_fit" and check.passed for check in report.checks)
     assert any(check.name == "file_size" and check.passed for check in report.checks)
+
+
+@pytest.mark.asyncio
+async def test_open_mesh_blocks_slicing(tmp_settings: Settings, tmp_path: Path) -> None:
+    mesh = trimesh.creation.box(extents=[20, 20, 20])
+    mesh.update_faces([i for i in range(len(mesh.faces)) if i != 0])
+    path = tmp_path / "open.stl"
+    mesh.export(path)
+    report = await DefaultValidationStage().run(PrintJob(model_path=str(path)), tmp_settings)
+    assert not report.passed
+    assert any(c.name == "watertight" and not c.passed for c in report.blocking_failures)
+
+
+@pytest.mark.asyncio
+async def test_empty_mesh_is_reported_without_bounds_crash(
+    tmp_settings: Settings, tmp_path: Path
+) -> None:
+    path = tmp_path / "empty.stl"
+    path.write_text("solid empty\nendsolid empty\n")
+    report = await DefaultValidationStage().run(PrintJob(model_path=str(path)), tmp_settings)
+    assert not report.passed
+
+
+@pytest.mark.asyncio
+async def test_tessellation_does_not_claim_wall_thickness(
+    tmp_settings: Settings, tmp_path: Path
+) -> None:
+    mesh = trimesh.creation.icosphere(subdivisions=4, radius=10)
+    path = tmp_path / "sphere.stl"
+    mesh.export(path)
+    report = await DefaultValidationStage().run(PrintJob(model_path=str(path)), tmp_settings)
+    check = next(c for c in report.checks if c.name == "thin_feature_risk")
+    assert not check.passed and check.severity == "info"
+    assert "not measured" in check.message
 
 
 def test_validation_report_score_field() -> None:

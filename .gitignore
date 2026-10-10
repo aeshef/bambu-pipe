@@ -12,6 +12,10 @@
 
 # Python
 .venv/
+.venv-cad/
+# Installed copies of the bundled skill; canonical source lives in the package.
+.agents/skills/bambu-design/
+.claude/skills/bambu-design/
 venv/
 __pycache__/
 *.py[cod]

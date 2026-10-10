@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "bambu-pipe"
-version = "0.2.0"
-description = "Local-first Python toolkit for Bambu Lab print automation"
+version = "0.3.0"
+description = "Agent-assisted parametric CAD and local Bambu Lab print automation"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
@@ -37,6 +37,10 @@ Issues = "https://github.com/aeshef/bambu-pipe/issues"
 Repository = "https://github.com/aeshef/bambu-pipe"
 
 [project.optional-dependencies]
+cad = [
+    "cadquery>=2.5,<3",
+    "matplotlib>=3.8,<4",
+]
 api = [
     "fastapi>=0.110",
     "uvicorn[standard]>=0.27",
@@ -54,6 +58,9 @@ dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
     "ruff>=0.4",
+]
+cad-dev = [
+    "bambu-pipe[dev,cad]",
 ]
 
 [project.scripts]

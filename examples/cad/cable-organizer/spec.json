@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "brief": "100 x 30 x 15 mm cable organizer: five open 6 mm channels, 3 mm floor, two 4 mm mounting holes 88 mm apart.",
+  "units": "mm",
+  "parameters": {
+    "width": 100, "depth": 30, "height": 15,
+    "corner_radius": 3, "floor": 3, "channel_count": 5,
+    "channel_diameter": 6, "channel_spacing": 16,
+    "mount_spacing": 88, "mount_diameter": 4
+  },
+  "dimensions_mm": [100, 30, 15],
+  "dimension_tolerance_mm": 0.2,
+  "bed_mm": [256, 256, 256],
+  "solid_count": 1,
+  "min_volume_mm3": 20000,
+  "probes": [
+    {"name": "left channel", "point_mm": [-32, 0, 6], "expect": "void"},
+    {"name": "second channel", "point_mm": [-16, 0, 6], "expect": "void"},
+    {"name": "center channel", "point_mm": [0, 0, 6], "expect": "void"},
+    {"name": "fourth channel", "point_mm": [16, 0, 6], "expect": "void"},
+    {"name": "right channel", "point_mm": [32, 0, 6], "expect": "void"},
+    {"name": "center channel open at top", "point_mm": [0, 0, 14.5], "expect": "void"},
+    {"name": "center channel near entry", "point_mm": [0, -14, 6], "expect": "void"},
+    {"name": "center channel near exit", "point_mm": [0, 14, 6], "expect": "void"},
+    {"name": "3 mm floor", "point_mm": [0, 0, 2.9], "expect": "solid"},
+    {"name": "web between channels", "point_mm": [8, 0, 8], "expect": "solid"},
+    {"name": "left mounting hole", "point_mm": [-44, 0, 7], "expect": "void"},
+    {"name": "right mounting hole", "point_mm": [44, 0, 7], "expect": "void"}
+  ],
+  "assumptions": [
+    "Open channels are not snap-fit retainers.",
+    "6 mm channel diameter includes no clearance; measure the actual cable and increase if needed.",
+    "Mounting holes are nominal 4 mm; tune clearance after a test print."
+  ]
+}

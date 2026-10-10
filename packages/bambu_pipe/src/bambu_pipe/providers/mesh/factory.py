@@ -14,7 +14,10 @@ def create_mesh_provider(settings: Settings) -> MeshProvider:
         if not api_key:
             raise ConfigError(
                 "Tripo provider selected but BAMBU_PIPE_TRIPO_API_KEY is not set",
-                suggestion="Set BAMBU_PIPE_TRIPO_API_KEY or use mesh_only mode.",
+                suggestion=(
+                    "Use `bambu-pipe design` with the bambu-design skill for local CAD, "
+                    "or set BAMBU_PIPE_TRIPO_API_KEY for Tripo text-to-mesh."
+                ),
             )
         try:
             from bambu_pipe.providers.mesh.tripo import TripoMeshProvider

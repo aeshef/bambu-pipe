@@ -44,5 +44,5 @@ class ValidationReport(BaseModel):
                 icon = "✗"
             lines.append(f"{icon} {check.name}: {check.message}")
         if self.score is not None:
-            lines.insert(0, f"Score: {self.score}%")
+            lines.insert(0, f"Heuristic score: {self.score}/100 (not a success probability)")
         return "\n".join(lines)

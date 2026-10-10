@@ -66,11 +66,32 @@ jobs:
           cd /tmp
           /tmp/bambu-pipe-wheel-smoke/bin/python - <<'PY'
           from bambu_pipe.config import Settings
+          from bambu_pipe.design.workspace import install_skill
+          from pathlib import Path
+          import tempfile
 
           profiles = Settings().resolved_profiles_dir
           assert (profiles / "profiles.json").is_file(), profiles
           print(f"profiles ok: {profiles}")
+          with tempfile.TemporaryDirectory() as directory:
+              skill = install_skill(Path(directory))
+              assert (skill / "SKILL.md").is_file()
+              assert (skill / "references" / "contract.md").is_file()
           PY
       - name: Docker build smoke
         if: matrix.python-version == '3.12'
         run: docker build -f docker/Dockerfile.api .
+
+  cad:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install real CAD engine and render dependencies
+        run: pip install -e "packages/bambu_pipe[cad-dev]"
+      - name: CAD dependency check
+        run: bambu-pipe design doctor
+      - name: Real CAD builds, export, rendering and review invalidation
+        run: pytest -q tests/cad tests/unit/test_design_contract.py

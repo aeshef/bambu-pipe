@@ -75,7 +75,9 @@ def _copy_preview_image(job: PrintJob, output_dir: Path) -> Path | None:
 def _preview_html(job: PrintJob) -> str:
     validation = job.artifacts.validation
     confidence = (
-        f"{validation.score}%" if validation and validation.score is not None else "unknown"
+        f"{validation.score}/100 (heuristic)"
+        if validation and validation.score is not None
+        else "unknown"
     )
     rows = [
         ("Job", job.id),
@@ -86,7 +88,7 @@ def _preview_html(job: PrintJob) -> str:
         ("Dimensions", _dimensions_text(job.artifacts.model_dimensions_mm)),
         ("Estimated time", job.artifacts.estimated_print_time or "unknown"),
         ("Estimated filament", _filament_text(job.artifacts.estimated_filament_g)),
-        ("Confidence", confidence),
+        ("Validation heuristic", confidence),
         ("Model", job.artifacts.model_path or job.model_path or "-"),
         ("Slice", job.artifacts.sliced_path or "-"),
     ]

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.0
+
+- Make agent-assisted parametric CAD the primary design workflow with the bundled `bambu-design` skill.
+- Add optional `[cad]` / `[cad-dev]` extras, real CadQuery builds, STEP/STL exports, four CPU-rendered views and offline HTML inspection.
+- Add strict dimension/spec contracts and material/void probes for feature checks.
+- Add build history, source/spec/artifact hashes, explicit visual review and stale-review rejection.
+- Add `design slice` to hand the verified STL to the existing local pipeline without contacting the printer.
+- Preserve millimeter dimensions and print orientation during slicing; remove implicit 100× scaling of small STL files and automatic orientation changes.
+- Resolve BBL slicer profile inheritance to full JSON settings, reject missing/cyclic parents and report native CLI crashes explicitly.
+- Block empty, non-finite, open and incorrectly wound meshes before slicing.
+- Stop using mesh-edge lengths as wall thickness; measure bed contact area, label scores as heuristics and exclude bed faces from overhang warnings.
+- Add real CAD integration tests, a CAD CI job and packaged-skill wheel checks.
+- Remove unused LLM settings; agent inference belongs to the user's agent harness.
+
 ## 0.2.0
 
 - Add `bambu-pipe print --dry-run` to produce a complete local print plan without contacting the printer.

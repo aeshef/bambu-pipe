@@ -10,6 +10,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from bambu_pipe.cli.design import app as design_app
 from bambu_pipe.config import Settings, load_settings
 from bambu_pipe.doctor import run_doctor
 from bambu_pipe.models.job import JobStage
@@ -103,7 +104,7 @@ def _print_validation_report(report: ValidationReport) -> None:
         )
     console.print(table)
     if report.score is not None:
-        console.print(f"Print Confidence Score: [bold]{report.score}%[/bold]")
+        console.print(f"Heuristic validation score: [bold]{report.score}/100[/bold]")
 
 
 def _job_payload(job) -> dict[str, object]:  # noqa: ANN001
@@ -111,7 +112,7 @@ def _job_payload(job) -> dict[str, object]:  # noqa: ANN001
 
 
 def _print_json(payload: object) -> None:
-    console.print(json.dumps(payload, indent=2, sort_keys=True))
+    typer.echo(json.dumps(payload, indent=2, sort_keys=True))
 
 
 def _print_plan_summary(job) -> None:  # noqa: ANN001
@@ -451,6 +452,7 @@ def _is_loopback_host(host: str) -> bool:
 
 
 app.add_typer(jobs_app, name="jobs")
+app.add_typer(design_app, name="design")
 
 
 def main() -> None:

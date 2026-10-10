@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
+import numpy as np
 import trimesh
 
 from bambu_pipe.config import Settings
@@ -67,6 +68,8 @@ def _validate_sync(job: PrintJob, settings: Settings) -> ValidationReport:
             suggestion="Simplify the mesh or upload a smaller file",
         )
     )
+    if file_size_mb > MAX_MODEL_FILE_MB:
+        return ValidationReport(checks=checks, score=_confidence_score(checks))
 
     try:
         mesh = _load_mesh(path)
@@ -79,6 +82,23 @@ def _validate_sync(job: PrintJob, settings: Settings) -> ValidationReport:
                 severity="error",
             )
         )
+        return ValidationReport(checks=checks, score=_confidence_score(checks))
+
+    has_geometry = (
+        isinstance(mesh, trimesh.Trimesh)
+        and len(mesh.vertices) > 0
+        and len(mesh.faces) > 0
+        and bool(np.isfinite(mesh.vertices).all())
+    )
+    checks.append(
+        ValidationCheck(
+            name="finite_geometry",
+            passed=has_geometry,
+            message="Mesh must contain triangles with finite coordinates",
+            severity="error",
+        )
+    )
+    if not has_geometry:
         return ValidationReport(checks=checks, score=_confidence_score(checks))
 
     bounds = mesh.bounds
@@ -117,8 +137,17 @@ def _validate_sync(job: PrintJob, settings: Settings) -> ValidationReport:
             name="watertight",
             passed=is_watertight,
             message=watertight_message,
-            severity="warning",
+            severity="error",
             suggestion="Repair the mesh or regenerate with printability constraints",
+        )
+    )
+    checks.append(
+        ValidationCheck(
+            name="positive_volume",
+            passed=bool(mesh.is_volume),
+            message="Mesh must enclose positive volume with consistent outward winding",
+            severity="error",
+            suggestion="Repair normals and closed geometry before slicing",
         )
     )
 
@@ -178,17 +207,15 @@ def _scale_sanity_checks(dimensions: list[float], settings: Settings) -> list[Va
 
 def _bed_contact_check(mesh: trimesh.Trimesh) -> ValidationCheck:
     min_z = float(mesh.bounds[0][2])
-    vertices = mesh.vertices
-    if len(vertices) == 0:
-        contact_ratio = 0.0
-    else:
-        near_bottom = abs(vertices[:, 2] - min_z) <= 0.2
-        contact_ratio = float(near_bottom.sum()) / float(len(vertices))
-    passed = contact_ratio >= 0.03
+    on_bed = mesh.triangles[:, :, 2].max(axis=1) <= min_z + 0.05
+    contact_area = float(mesh.area_faces[on_bed].sum())
+    footprint_area = float(mesh.extents[0] * mesh.extents[1])
+    contact_ratio = contact_area / footprint_area if footprint_area > 0 else 0.0
+    passed = contact_ratio >= 0.01
     return ValidationCheck(
         name="bed_contact",
         passed=passed,
-        message=f"{contact_ratio:.1%} of vertices are near the lowest Z plane",
+        message=f"{contact_area:.2f} mm² near the bed ({contact_ratio:.1%} of XY bounding area)",
         severity="warning",
         suggestion="Prefer a flat bottom or add supports/brim if contact is small",
     )
@@ -198,7 +225,11 @@ def _overhang_check(mesh: trimesh.Trimesh) -> ValidationCheck:
     if len(mesh.faces) == 0 or len(mesh.face_normals) == 0:
         ratio = 0.0
     else:
-        downward = mesh.face_normals[:, 2] < -0.35
+        # Bed-facing bottom triangles need no supports. Mesh edge length and
+        # vertex density also cannot measure wall thickness or contact area.
+        bottom = float(mesh.bounds[0][2])
+        on_bed = mesh.triangles[:, :, 2].max(axis=1) <= bottom + 0.2
+        downward = (mesh.face_normals[:, 2] < -np.cos(np.radians(45))) & ~on_bed
         total_area = float(mesh.area_faces.sum()) or 1.0
         ratio = float(mesh.area_faces[downward].sum()) / total_area
     passed = ratio <= 0.25
@@ -212,24 +243,19 @@ def _overhang_check(mesh: trimesh.Trimesh) -> ValidationCheck:
 
 
 def _thin_feature_check(mesh: trimesh.Trimesh, dimensions: list[float]) -> ValidationCheck:
-    if len(mesh.edges_unique_length) == 0:
-        shortest = min(dimensions)
-    else:
-        shortest = float(mesh.edges_unique_length.min())
-    passed = shortest >= 0.35
     return ValidationCheck(
         name="thin_feature_risk",
-        passed=passed,
-        message=f"Shortest mesh edge is about {shortest:.2f} mm",
-        severity="warning",
-        suggestion="Thin details below nozzle width can disappear or break",
+        passed=False,
+        message="Wall thickness is not measured; triangle edge length is not wall thickness",
+        severity="info",
+        suggestion="Inspect CAD wall dimensions and the sliced extrusion paths",
     )
 
 
 def _confidence_score(checks: list[ValidationCheck]) -> int:
     score = 100
     for check in checks:
-        if check.passed:
+        if check.passed or check.severity == "info":
             continue
         score -= 45 if check.severity == "error" else 15
     return max(0, min(100, score))

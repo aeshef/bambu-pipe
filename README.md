@@ -1,236 +1,155 @@
 # bambu-pipe
 
 [![CI](https://github.com/aeshef/bambu-pipe/actions/workflows/ci.yml/badge.svg)](https://github.com/aeshef/bambu-pipe/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/aeshef/bambu-pipe?include_prereleases&label=release)](https://github.com/aeshef/bambu-pipe/releases)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Printer](https://img.shields.io/badge/printer-Bambu%20Lab%20A1-orange.svg)](docs/printer-setup.md)
-[![Mode](https://img.shields.io/badge/mode-LAN%20Developer%20Mode-black.svg)](docs/printer-setup.md)
-[![Local First](https://img.shields.io/badge/local--first-no%20cloud-black)](docs/architecture.md)
 
-![bambu-pipe logo](docs/assets/logo.svg)
+**Describe a part to your coding agent. Get editable CAD, measured geometry,
+inspection views and a reviewed model. Slice and print locally when ready.**
 
-Turn a mesh or text prompt into a validated, sliced, LAN-started print on a
-Bambu Lab A1.
+The primary workflow uses a terminal/vision agent you already have and a local
+CadQuery engine. The agent reasons about shape, writes parametric Python,
+inspects four rendered views and iterates. The toolkit exports STEP/STL and
+checks geometry independently of the agent's prose. No generation API key,
+GPU, hosted backend or graphical CAD application is needed for this workflow.
 
-`bambu-pipe` is a local-first Python toolkit for builders who want automation
-without a desktop slicer UI, cloud lock-in, hosted accounts, or fragile printer
-scripts.
+Best for dimensioned parts: mounts, brackets, enclosures, organizers, adapters
+and fixtures. Organic sculptures can still use the optional Tripo provider;
+its generated mesh requires separate inspection and validation.
 
-[Getting Started](#quick-start) · [Python API](docs/python-api.md) · [Docs](docs/architecture.md) · [Printer Setup](docs/printer-setup.md) · [Configuration](docs/configuration.md) · [Provider Contracts](docs/provider-contracts.md) · [PyPI Setup](docs/pypi-publish.md) · [Tripo Smoke](docs/tripo-smoke.md) · [Release Process](docs/release.md) · [Roadmap](PLAN.md) · [Security](SECURITY.md) · [Support](SUPPORT.md) · [Issues](https://github.com/aeshef/bambu-pipe/issues)
+## Quick start
 
-## Why It Exists
-
-Most 3D printing workflows still stop at the boring parts: open a slicer, pick
-profiles, export a project file, upload it, start the job, check whether the
-printer accepted it, then repeat when something silently fails.
-
-`bambu-pipe` makes that flow programmable:
-
-```text
-text prompt or mesh -> validation -> OrcaSlicer -> preview metadata -> approval -> Bambu A1
-```
-
-## Highlights
-
-- Headless A1 LAN printing over FTPS and MQTT.
-- OrcaSlicer integration with profile registry driven by JSON, not Python mappings.
-- `mesh_only` jobs for existing STL/OBJ/3MF/GLB assets.
-- `text_full` jobs through a Tripo-compatible text-to-3D provider.
-- Print Confidence Score from validation checks.
-- Dry-run print plans with preview HTML, thumbnail, estimates, and artifact manifest.
-- Approval gates before slicing and printing.
-- Python API, CLI, optional local REST adapter, Docker local-adapter image, and Telegram voice adapter.
-- SQLite job persistence for API mode.
-- Secret-safe REST uploads: no arbitrary server-local `model_path` from HTTP clients.
-- Open-source hygiene: CI, Dependabot, issue templates, docs, MIT license.
-
-## Quick Start
+Use Python **3.11 or 3.12** for the CAD extra (newer Python versions may lack CAD
+binary wheels). A slicer and printer are needed only for the later print stage.
 
 ```bash
 git clone https://github.com/aeshef/bambu-pipe.git
 cd bambu-pipe
-
-python -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
-pip install -e "packages/bambu_pipe[all]"
+pip install -e 'packages/bambu_pipe[cad]'
 
-cp .env.example .env
-# Fill printer IP, serial, access code, and provider keys.
-
-bambu-pipe doctor
+bambu-pipe design doctor
+bambu-pipe design install-skill --target .agents/skills
 ```
 
-For printer setup, see [`docs/printer-setup.md`](docs/printer-setup.md). A
-default A1 profile pack is bundled for wheel installs; for custom OrcaSlicer
-profiles and material registry details, see [`profiles/README.md`](profiles/README.md).
+Open this folder in Codex and use `$bambu-design`, for example:
 
-## CLI
+> Make a cable organizer 100 × 30 × 15 mm with five 6 mm channels. Use PLA,
+> 2 mm walls and a flat base. Build it, inspect every view and give me editable
+> CAD and STL. Ask if a dimension needed for fit is missing.
+
+For another skill-capable terminal agent, install the same skill into its skills
+folder, e.g. `--target .claude/skills`. Alternatively point an agent directly at
+[SKILL.md](packages/bambu_pipe/src/bambu_pipe/skills/bambu-design/SKILL.md).
+Your agent needs file/terminal access and image inspection. A plain chat UI
+cannot execute this local pipeline by itself.
+
+**Costs:** geometry, rendering and checks run locally. Agent inference uses
+whatever subscription, API or local model your agent already uses. This package
+neither bundles an LLM nor invokes a paid generation service in the CAD path.
+
+## A reproducible design loop
+
+```text
+brief + dimensions → parameterized CAD → STEP/STL + four views
+         ↑                  ↓
+       revise ← mechanical checks + actual visual inspection
+                            ↓
+                  review bound to this build → local slice → print approval
+```
+
+You can also drive each step yourself:
 
 ```bash
-# Validate local setup.
-bambu-pipe doctor
+# Creates a mounting-plate starter, NOT a model inferred from your brief.
+bambu-pipe design init ./output/plate
+# Adapt model.py and spec.json to your requirements.
+bambu-pipe design build ./output/plate --json
+# Open this build's isometric.png, front.png, right.png and top.png.
+# Record a review only after inspecting them:
+bambu-pipe design review ./output/plate --decision accept --reviewer me \
+  --view isometric.png --view front.png --view right.png --view top.png \
+  --notes 'Two through holes and the web match the brief; fit still needs a test print.'
+bambu-pipe design verify ./output/plate
+```
 
-# Check a model without slicing or touching the printer.
+Every build keeps source/spec snapshots, `model.step`, `model.stl`, four PNGs,
+`preview.html`, measurements and checks in `builds/<id>/`. A failed new build
+invalidates the latest pointer. A changed source, spec, model, image or report
+invalidates its review. `verify` prints the exact reviewed STL path as JSON.
+`review` records a reviewer attestation; it is not a hidden visual LLM call.
+
+Checks cover CAD validity, solid count, dimensions, bed fit, volume, Z=0
+placement, material/void probes, mesh watertightness, winding and STL/CAD size
+agreement. Point probes sample features; they do not prove every surface.
+Wall thickness, strength, clearance, supports and real-world fit still need
+CAD/slicer inspection and sometimes a test print. The validation score is a
+heuristic, **not a probability of print success**.
+
+Read [the design guide](docs/design.md) for the spec contract and failure recovery.
+
+Try a complete [five-channel cable organizer](examples/cad/cable-organizer)
+without any agent or provider call:
+
+```bash
+mkdir -p output/cable-organizer
+cp examples/cad/cable-organizer/model.py examples/cad/cable-organizer/spec.json output/cable-organizer/
+bambu-pipe design build output/cable-organizer
+```
+
+## Slice and print
+
+Install OrcaSlicer or Bambu Studio and configure the correct profiles. See
+[printer setup](docs/printer-setup.md) and [profiles](profiles/README.md).
+
+```bash
+# Verify the reviewed build, validate and slice it; no printer connection.
+bambu-pipe design slice ./output/plate --material PLA --quality standard
+
+# Other local meshes keep the existing CLI:
 bambu-pipe validate --model ./model.stl
-
-# Slice locally and inspect preview metadata without uploading.
 bambu-pipe preview --model ./model.stl --material PETG
 
-# Generate the full print plan without contacting the printer.
-bambu-pipe print "small low-poly cat figurine" --dry-run --material PLA
-
-# Slice and start a local model.
-bambu-pipe print --model ./model.stl --material PETG --yes
-
-# Generate a model from text, then validate, slice, approve, and print.
-bambu-pipe print "small low-poly cat figurine"
-
-# Read printer state over LAN MQTT.
-bambu-pipe status
-
-# Inspect persisted local jobs.
-bambu-pipe jobs
-bambu-pipe jobs show <job-id>
-bambu-pipe jobs artifacts <job-id> --json
+# After inspecting the slice, use the verified STL path and explicitly start a print.
+bambu-pipe print --model <verified-stl-path> --material PLA --yes
 ```
 
-## Python API
+`design` never uploads or starts a print. The physical print command uses FTPS
+and MQTT with Bambu A1 LAN / Developer Mode credentials. Configuration is only
+needed at that stage; [`.env.example`](.env.example) lists supported settings.
 
-```python
-import asyncio
+## Existing integrations
 
-from bambu_pipe import BambuPipeline
+The local toolkit remains usable independently of the CAD skill:
 
+- `BambuPipeline` Python API: [documentation](docs/python-api.md).
+- Optional FastAPI local adapter, SQLite jobs and uploads: [API](docs/api.md).
+- Optional Telegram voice adapter: [voice2bambu](packages/voice2bambu/README.md).
+- Tripo text-to-mesh: install `[tripo]`, configure the provider explicitly, then
+  `bambu-pipe print 'small low-poly cat' --dry-run`. See [provider smoke test](docs/tripo-smoke.md).
+- `doctor`, `status`, `jobs show`, `jobs artifacts`, `jobs retry` and existing
+  mesh/slice/print approval stages remain available.
 
-async def main() -> None:
-    pipeline = BambuPipeline.from_env()
-    await pipeline.print_model("model.stl", material="PETG", auto_approve=True)
-    await pipeline.print_prompt("small low-poly cat figurine")
+The REST API handles print jobs and meshes; CAD Python execution is a trusted
+local CLI operation and is not exposed as a remote upload endpoint.
 
-
-asyncio.run(main())
-```
-
-More runnable snippets live in [`examples/`](examples/).
-
-## Local REST Adapter
-
-The REST API is an optional local adapter for integrations. It is not a hosted
-service and should not be exposed directly to the public internet.
+## Development
 
 ```bash
-pip install -e "packages/bambu_pipe[api]"
-bambu-pipe serve --host <local-adapter-host> --port 8080
+pip install -e 'packages/bambu_pipe[cad-dev]'
+ruff check packages/bambu_pipe/src packages/voice2bambu/src tests apps examples
+ruff format --check packages/bambu_pipe/src packages/voice2bambu/src tests apps examples
+pytest -q
+python -m build packages/bambu_pipe
 ```
 
-Set `BAMBU_PIPE_API_TOKEN` before binding the adapter beyond loopback. Mutating
-requests then use `Authorization: Bearer <token>`.
+CAD dependencies are optional. The base suite runs without them; the CAD suite
+uses real OpenCascade builds and headless rendering when `[cad]` is installed.
+CI runs both suites and checks that wheels include the skill.
 
-```bash
-export BAMBU_PIPE_API_BASE_URL="http://<local-adapter-host>:8080/api/v1"
+[Architecture](docs/architecture.md) · [Configuration](docs/configuration.md) ·
+[Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) ·
+[Issues](https://github.com/aeshef/bambu-pipe/issues)
 
-curl "$BAMBU_PIPE_API_BASE_URL/health"
-
-curl -X POST "$BAMBU_PIPE_API_BASE_URL/jobs/upload?auto_approve=true" \
-  -H "Authorization: Bearer $BAMBU_PIPE_API_TOKEN" \
-  -F "file=@./model.stl"
-
-curl -X POST "$BAMBU_PIPE_API_BASE_URL/jobs/<id>/run"
-curl "$BAMBU_PIPE_API_BASE_URL/jobs/<id>/preview"
-curl -X POST "$BAMBU_PIPE_API_BASE_URL/jobs/<id>/approve" \
-  -H "Content-Type: application/json" \
-  -d '{"approved":true}'
-```
-
-One-shot upload-and-run is available through `POST /api/v1/jobs/print` with the
-same multipart parameters as `/jobs/upload`.
-
-## Text-To-Print
-
-`text_full` uses the configured Tripo-compatible provider. Add the key to your
-local `.env`:
-
-```bash
-BAMBU_PIPE_MESH_PROVIDER=tripo
-BAMBU_PIPE_TRIPO_API_KEY=...
-```
-
-Then create a job through CLI or REST:
-
-```bash
-bambu-pipe print "desk toy robot, printable as a single object"
-```
-
-## Docker
-
-```bash
-cp .env.example .env
-docker compose -f docker/compose.yml up --build
-```
-
-The API container needs LAN access to the printer and access to Orca profiles.
-If slicing inside the container, mount or install an OrcaSlicer binary.
-
-## Architecture
-
-`bambu-pipe` follows a ports-and-adapters design:
-
-- `bambu_pipe.orchestrator.PipelineOrchestrator` owns the state machine.
-- `bambu_pipe.stages.*` contains atomic generation, validation, slicing, and print stages.
-- `bambu_pipe.providers.*` contains replaceable mesh and slicer providers.
-- `bambu_pipe.printer.*` isolates FTPS, MQTT, payload construction, and status parsing.
-- Public Python code uses `bambu_pipe.BambuPipeline`.
-- `apps/api` and `packages/voice2bambu` stay thin and call the core pipeline.
-
-See [`docs/architecture.md`](docs/architecture.md) for the compact system map.
-
-## Release Status
-
-v0.1 targets one reliable hardware path:
-
-- Bambu Lab A1.
-- LAN / Developer Mode.
-- OrcaSlicer profiles.
-- Mesh upload or Tripo-compatible text generation.
-- Approval-gated start over local printer transport.
-
-Not in scope: Bambu cloud mode, warranty support, filament quality problems, or
-non-A1 profile packs.
-
-## Documentation
-
-- [Architecture](docs/architecture.md)
-- [Python API](docs/python-api.md)
-- [Configuration](docs/configuration.md)
-- [Provider contracts](docs/provider-contracts.md)
-- [PyPI publishing setup](docs/pypi-publish.md)
-- [Printer setup](docs/printer-setup.md)
-- [Real Tripo smoke test](docs/tripo-smoke.md)
-- [REST API](docs/api.md)
-- [Profiles and materials](profiles/README.md)
-- [Roadmap](PLAN.md)
-- [Release process](docs/release.md)
-- [Security policy](SECURITY.md)
-- [Support](SUPPORT.md)
-
-## Contributing
-
-Issues and PRs are welcome. Please include:
-
-- `bambu-pipe doctor` output with secrets removed.
-- Printer model and firmware version.
-- Material, profile, and AMS/external filament mode.
-- The exact command or API request that failed.
-
-Start with [`CONTRIBUTING.md`](CONTRIBUTING.md) and the PR template.
-
-## Contact
-
-- GitHub: [aeshef/bambu-pipe](https://github.com/aeshef/bambu-pipe)
-- Issues: [github.com/aeshef/bambu-pipe/issues](https://github.com/aeshef/bambu-pipe/issues)
-
-## License
-
-MIT. Bambu Lab is a trademark of its owner; this project is independent and not
-affiliated with Bambu Lab.
+MIT. Independent project, not affiliated with Bambu Lab.

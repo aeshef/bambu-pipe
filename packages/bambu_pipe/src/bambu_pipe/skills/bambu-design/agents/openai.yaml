@@ -1,0 +1,4 @@
+interface:
+  display_name: "Bambu Design"
+  short_description: "Build and inspect editable CAD parts locally"
+  default_prompt: "Use $bambu-design to create a dimensioned printable part, inspect its views and deliver reviewed CAD artifacts."

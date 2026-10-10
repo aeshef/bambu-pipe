@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     # Slicer
     slicer_mode: Literal["local"] = "local"
     slicer_binary: Path | None = None
+    slicer_resource_profiles_dir: Path | None = None
     profiles_dir: Path | None = None
     quality: Literal["draft", "standard", "fine"] = "standard"
     material: str = "PLA"
@@ -61,9 +62,6 @@ class Settings(BaseSettings):
     mesh_provider: str = "tripo"
     tripo_api_key: SecretStr | None = None
     tripo_base_url: str = "https://api.tripo3d.ai/v2/openapi"
-    llm_api_key: SecretStr | None = None
-    llm_base_url: str = "https://api.openai.com/v1"
-    llm_model: str = "gpt-4o-mini"
 
     @field_validator("staging_dir", "database_path", mode="before")
     @classmethod
