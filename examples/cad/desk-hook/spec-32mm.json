@@ -1,0 +1,153 @@
+{
+  "schema_version": 1,
+  "brief": "Desk-edge headphone hook for a 32 mm desk; see brief.md for exact dimensions. Print on its side.",
+  "units": "mm",
+  "parameters": {
+    "desk_thickness": 32,
+    "clearance": 0.5,
+    "wall": 6,
+    "width": 35,
+    "desk_reach": 38,
+    "hook_reach": 42,
+    "slot_floor": 35,
+    "tip_height": 20,
+    "corner_radius": 2,
+    "screw_x": 22,
+    "screw_diameter": 4.5,
+    "nut_across_flats": 7.2,
+    "nut_depth": 2.8
+  },
+  "dimensions_mm": [
+    80,
+    73.5,
+    35
+  ],
+  "dimension_tolerance_mm": 0.1,
+  "solid_count": 1,
+  "min_volume_mm3": 28000,
+  "probes": [
+    {
+      "name": "desk opening middle",
+      "point_mm": [
+        12,
+        -51.25,
+        17.5
+      ],
+      "expect": "void"
+    },
+    {
+      "name": "desk opening above lower lip",
+      "point_mm": [
+        12,
+        -35.3,
+        17.5
+      ],
+      "expect": "void"
+    },
+    {
+      "name": "desk opening below upper lip",
+      "point_mm": [
+        12,
+        -67.2,
+        17.5
+      ],
+      "expect": "void"
+    },
+    {
+      "name": "lower desk lip",
+      "point_mm": [
+        12,
+        -32,
+        17.5
+      ],
+      "expect": "solid"
+    },
+    {
+      "name": "upper desk lip",
+      "point_mm": [
+        12,
+        -70.5,
+        17.5
+      ],
+      "expect": "solid"
+    },
+    {
+      "name": "backbone",
+      "point_mm": [
+        -3,
+        -45,
+        17.5
+      ],
+      "expect": "solid"
+    },
+    {
+      "name": "hanging arm",
+      "point_mm": [
+        -20,
+        -3,
+        17.5
+      ],
+      "expect": "solid"
+    },
+    {
+      "name": "retaining tip",
+      "point_mm": [
+        -39,
+        -15,
+        17.5
+      ],
+      "expect": "solid"
+    },
+    {
+      "name": "hook opening",
+      "point_mm": [
+        -20,
+        -15,
+        17.5
+      ],
+      "expect": "void"
+    },
+    {
+      "name": "screw through hole",
+      "point_mm": [
+        22,
+        -33,
+        17.5
+      ],
+      "expect": "void"
+    },
+    {
+      "name": "material around screw",
+      "point_mm": [
+        24.6,
+        -33,
+        17.5
+      ],
+      "expect": "solid"
+    },
+    {
+      "name": "nut recess outside pilot",
+      "point_mm": [
+        25,
+        -30.2,
+        17.5
+      ],
+      "expect": "void"
+    },
+    {
+      "name": "material above nut recess",
+      "point_mm": [
+        25,
+        -33.5,
+        17.5
+      ],
+      "expect": "solid"
+    }
+  ],
+  "assumptions": [
+    "Nominal desk thickness and 0.5 mm clearance; physical fit is untested.",
+    "4.5 mm hole and 7.2 mm nut pocket are nominal M4 hardware clearances; measure actual hardware.",
+    "Optional screw and nut are not included in the CAD export.",
+    "Printed on its side; support/toolpath verification and load testing remain undone."
+  ]
+}

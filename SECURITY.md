@@ -27,6 +27,11 @@ maintainer through the repository owner profile. Include:
 
 ## Security Boundaries
 
+- CAD source executes as local Python with the invoking user's access. Inspect
+  unfamiliar source before running it. A subprocess timeout is not a security sandbox.
+- CAD execution is a local CLI operation, not an arbitrary-code REST upload endpoint.
+- Build/review hashes prevent accidental staleness; they are not signed evidence
+  against a malicious party rewriting every file.
 - The REST adapter is local-first and should not be exposed directly to the public internet.
 - Set `BAMBU_PIPE_API_TOKEN` before binding the REST adapter beyond loopback.
 - `.env`, printer access codes, generated files, databases, and caches must stay out of git.
