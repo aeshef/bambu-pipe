@@ -10,7 +10,7 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
 authors = [{ name = "bambu-pipe contributors" }]
-keywords = ["3d-printing", "bambu-lab", "orca-slicer", "automation"]
+keywords = ["cad", "cadquery", "agent-skills", "3d-printing", "bambu-lab", "automation"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",

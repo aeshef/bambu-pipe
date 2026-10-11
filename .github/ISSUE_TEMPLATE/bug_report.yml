@@ -1,0 +1,53 @@
+name: Reproducible bug
+description: A CAD, review, installation, slicer or printer failure
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Never include tokens, printer access codes or a complete .env file. Physical printing is not required for CAD reports.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [Installation, CAD build, Rendering, Review or verification, Slicing, Printer transport, API or CLI, Documentation]
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+      description: Include the command, result and why it disagrees with your brief.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: v0.3.0 or a commit SHA
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Operating system and Python version
+      placeholder: macOS / Linux / Windows; Python 3.12.x
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: For CAD, include a small model.py and spec.json or a link to them. Remove secrets and unrelated files.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output
+      description: A build report, worker.log excerpt or slicer error. Redact secrets and personal paths.
+      render: text
+  - type: input
+    id: hardware
+    attributes:
+      label: Printer, slicer and material (only if relevant)
+      description: Leave blank for CAD-only bugs.

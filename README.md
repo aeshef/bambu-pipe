@@ -1,11 +1,23 @@
 # bambu-pipe
 
 [![CI](https://github.com/aeshef/bambu-pipe/actions/workflows/ci.yml/badge.svg)](https://github.com/aeshef/bambu-pipe/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/aeshef/bambu-pipe)](https://github.com/aeshef/bambu-pipe/releases/latest)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-**Describe a part to your coding agent. Get editable CAD, measured geometry,
-inspection views and a reviewed model. Slice and print locally when ready.**
+**Give your coding agent a local CAD workbench.**
+
+Describe a dimensioned part. Let your existing terminal/vision agent write
+parametric CAD, inspect it and revise it. Get editable Python, STEP/STL,
+geometry checks and a review tied to the exact build. Bambu printing is optional.
+
+![A desk-edge hook adapted from a 24 mm desk to a 32 mm desk](docs/assets/showcase.gif)
+
+*A desk-hook prototype authored in a Codex session from the included
+[brief](examples/cad/desk-hook/brief.md). The animation replays measured CAD
+exports, including an intentionally seeded missing-hole control. It is not a
+real-time recording or a physical-print result. [Reproduce it](examples/showcase)
+· [Download the release and video](https://github.com/aeshef/bambu-pipe/releases/latest).*
 
 The primary workflow uses a terminal/vision agent you already have and a local
 CadQuery engine. The agent reasons about shape, writes parametric Python,
@@ -16,6 +28,19 @@ GPU, hosted backend or graphical CAD application is needed for this workflow.
 Best for dimensioned parts: mounts, brackets, enclosures, organizers, adapters
 and fixtures. Organic sculptures can still use the optional Tripo provider;
 its generated mesh requires separate inspection and validation.
+
+## Who does what?
+
+| Piece | Responsibility |
+| --- | --- |
+| Your existing agent | Interpret the brief, write CAD, look at images, revise and record a review |
+| `bambu-design` skill | Instructions and acceptance criteria for that workflow |
+| Local Python tools | Execute CadQuery, measure geometry, export files and render four views |
+| Optional slicer/printer adapters | Prepare and print the reviewed part after separate approval |
+
+The package does not call an LLM or run a built-in multi-agent service. A skill
+guides your existing agent; mechanical checks and visual review have distinct
+roles. [Architecture](docs/architecture.md) · [FAQ](docs/faq.md).
 
 ## Quick start
 
@@ -35,9 +60,12 @@ bambu-pipe design install-skill --target .agents/skills
 
 Open this folder in Codex and use `$bambu-design`, for example:
 
-> Make a cable organizer 100 × 30 × 15 mm with five 6 mm channels. Use PLA,
-> 2 mm walls and a flat base. Build it, inspect every view and give me editable
-> CAD and STL. Ask if a dimension needed for fit is missing.
+> $bambu-design Read examples/cad/desk-hook/brief.md. Design the part from the
+> brief in a new workspace, build it, inspect all four views and give me the
+> source, STEP, STL and remaining assumptions. Keep physical printing separate.
+
+This is an **agent run**. Copying a saved example and rebuilding it, below, is
+a **reproduction run**. Neither is a benchmark of arbitrary CAD competence.
 
 For another skill-capable terminal agent, install the same skill into its skills
 folder, e.g. `--target .claude/skills`. Alternatively point an agent directly at
@@ -89,14 +117,33 @@ heuristic, **not a probability of print success**.
 
 Read [the design guide](docs/design.md) for the spec contract and failure recovery.
 
-Try a complete [five-channel cable organizer](examples/cad/cable-organizer)
-without any agent or provider call:
+## Try a saved example
+
+Run a complete [desk-edge hook](examples/cad/desk-hook) without an agent call,
+printer, slicer or paid service:
 
 ```bash
-mkdir -p output/cable-organizer
-cp examples/cad/cable-organizer/model.py examples/cad/cable-organizer/spec.json output/cable-organizer/
-bambu-pipe design build output/cable-organizer
+mkdir -p output/desk-hook
+cp examples/cad/desk-hook/model.py examples/cad/desk-hook/spec.json output/desk-hook/
+bambu-pipe design build output/desk-hook
+# Open this build's four PNGs. Record a review after inspection, then verify.
 ```
+
+The [showcase guide](examples/showcase) reproduces both desk sizes and the
+missing-hole control, and explains the downloadable demo's editing and claims.
+A simpler [five-channel cable organizer](examples/cad/cable-organizer) is also included.
+
+## Help build it
+
+No printer is required to contribute to CAD checks, documentation or rendering.
+
+- Start with a scoped [good first issue](https://github.com/aeshef/bambu-pipe/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
+- Follow the [contributor guide](CONTRIBUTING.md); it includes a minimal development setup.
+- Share your brief, result and remaining limitations in [Discussions](https://github.com/aeshef/bambu-pipe/discussions).
+- Read the [roadmap](ROADMAP.md), or [report a reproducible failure](https://github.com/aeshef/bambu-pipe/issues/new/choose).
+
+If the workbench is useful to you, a star helps people find it. A reproducible
+failure or a measured fit result helps improve it.
 
 ## Slice and print
 

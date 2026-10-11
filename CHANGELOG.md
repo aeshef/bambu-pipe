@@ -13,6 +13,8 @@
 - Stop using mesh-edge lengths as wall thickness; measure bed contact area, label scores as heuristics and exclude bed faces from overhang warnings.
 - Add real CAD integration tests, a CAD CI job and packaged-skill wheel checks.
 - Remove unused LLM settings; agent inference belongs to the user's agent harness.
+- Add a dimensioned desk-hook example, two checked size variants, a seeded missing-hole control and reproducible launch-media tools.
+- Improve contributor onboarding, issue forms, project roadmap and architecture FAQ.
 
 ## 0.2.0
 
