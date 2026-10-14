@@ -93,9 +93,24 @@ def test_extract_3mf_thumbnail_writes_sidecar_file(tmp_path) -> None:
     output = tmp_path / "print.gcode.3mf"
     with ZipFile(output, "w") as zf:
         zf.writestr("Metadata/plate_1.png", b"image")
+        zf.writestr("Metadata/pick_1.png", b"object selection mask")
+        zf.writestr("Metadata/top_1.png", b"top view")
 
     thumbnail = _extract_3mf_thumbnail(output)
 
     assert thumbnail is not None
     assert thumbnail.name == "print.gcode.thumbnail.png"
     assert thumbnail.read_bytes() == b"image"
+
+
+def test_parse_bambu_studio_total_filament_weight(tmp_path):
+    path = tmp_path / "slice.3mf"
+    with ZipFile(path, "w") as archive:
+        archive.writestr(
+            "Metadata/plate_1.gcode",
+            "; total filament weight [g] : 81.35\n"
+            "; model printing time: 4h 14m 15s; total estimated time: 4h 20m 32s\n",
+        )
+    result = _parse_3mf_gcode_metadata(path)
+    assert result["estimated_filament_g"] == 81.35
+    assert result["estimated_print_time"] == "4h 20m 32s"

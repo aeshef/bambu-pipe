@@ -25,6 +25,7 @@ def discover_orca_slicer(explicit: Path | None = None) -> Path | None:
             [
                 Path("/Applications/OrcaSlicer.app/Contents/MacOS/OrcaSlicer"),
                 Path.home() / "Applications/OrcaSlicer.app/Contents/MacOS/OrcaSlicer",
+                Path.home() / "Applications/BambuStudio.app/Contents/MacOS/BambuStudio",
                 Path("/Applications/BambuStudio.app/Contents/MacOS/BambuStudio"),
             ]
         )

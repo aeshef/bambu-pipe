@@ -74,9 +74,14 @@ def test_slicer_keeps_small_model_dimensions_and_orientation(
     captured = []
 
     def run(command, **kwargs):
+        assert kwargs["cwd"] == str(output.parent)
         captured.append(command)
         with ZipFile(output, "w") as archive:
-            archive.writestr("Metadata/project_settings.config", "{}")
+            archive.writestr(
+                "Metadata/project_settings.config",
+                json.dumps({"curr_bed_type": "Textured PEI Plate"}),
+            )
+            archive.writestr("Metadata/plate_1.gcode", "M83\nG1 X1 Y1 E0.2\n")
         return SimpleNamespace(returncode=0, stdout="", stderr="")
 
     monkeypatch.setattr("subprocess.run", run)
@@ -84,6 +89,7 @@ def test_slicer_keeps_small_model_dimensions_and_orientation(
         binary=tmp_path / "fake-slicer", model_path=model, output_path=output, settings=tmp_settings
     )
     assert captured[0][-1] == str(model)
+    assert captured[0][captured[0].index("--curr-bed-type") + 1] == "Textured PEI Plate"
     assert captured[0][captured[0].index("--orient") + 1] == "0"
     assert model.read_bytes() == original
     assert not list(tmp_path.glob("*_scaled.stl"))
@@ -102,6 +108,8 @@ def test_native_crash_has_actionable_message(tmp_path, tmp_settings, monkeypatch
     monkeypatch.setattr(
         "subprocess.run", lambda *a, **k: SimpleNamespace(returncode=-11, stdout="", stderr="")
     )
+    output = tmp_path / "output.3mf"
+    output.write_bytes(b"stale previous result")
     with pytest.raises(SliceError, match="crashed with signal 11") as error:
         _slice_sync(
             binary=tmp_path / "BambuStudio",
@@ -110,3 +118,6 @@ def test_native_crash_has_actionable_message(tmp_path, tmp_settings, monkeypatch
             settings=tmp_settings,
         )
     assert "BAMBU_PIPE_SLICER_BINARY" in error.value.suggestion
+
+    assert not output.exists()
+    assert (tmp_path / "slicer.log").is_file()

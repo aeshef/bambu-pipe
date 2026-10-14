@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any
-from zipfile import ZIP_DEFLATED, ZipFile
+from zipfile import ZIP_DEFLATED, BadZipFile, ZipFile
 
 from bambu_pipe.config import Settings
 from bambu_pipe.models.errors import ConfigError, SliceError
@@ -17,6 +17,39 @@ from bambu_pipe.providers.slicer.discovery import discover_orca_slicer
 from bambu_pipe.providers.slicer.profiles import discover_resource_profiles, flatten_profiles
 
 DEFAULT_PROFILE_REGISTRY = "profiles.json"
+
+
+def validate_sliced_archive(output_path: Path, *, expected_bed_type: str | None = None) -> None:
+    """Require one intact, sliced plate matching the printer payload's plate_1 path.
+
+    This checks the local handoff format, not physical printability.
+    """
+    try:
+        with ZipFile(output_path) as archive:
+            damaged = archive.testzip()
+            if damaged:
+                raise SliceError(f"Sliced archive has a corrupt entry: {damaged}")
+            plates = [
+                name
+                for name in archive.namelist()
+                if name.startswith("Metadata/plate_") and name.endswith(".gcode")
+            ]
+            if plates != ["Metadata/plate_1.gcode"]:
+                raise SliceError("Expected exactly one sliced plate: Metadata/plate_1.gcode")
+            if expected_bed_type is not None:
+                config = json.loads(archive.read("Metadata/project_settings.config"))
+                if not isinstance(config, dict) or config.get("curr_bed_type") != expected_bed_type:
+                    raise SliceError("Sliced bed type does not match the printer command")
+            gcode = archive.read(plates[0]).decode("utf-8")
+            commands = "\n".join(line.split(";", 1)[0] for line in gcode.splitlines())
+            if not re.search(
+                r"^G[123]\s[^\n]*\bE-?(?:[1-9]\d*(?:\.\d*)?|0?\.\d*[1-9]\d*)(?:\s|$)",
+                commands,
+                re.MULTILINE,
+            ):
+                raise SliceError("Sliced plate contains no extrusion moves")
+    except (OSError, BadZipFile, UnicodeDecodeError, KeyError, json.JSONDecodeError) as exc:
+        raise SliceError(f"Invalid sliced archive: {output_path.name}") from exc
 
 
 def _parse_slice_output(stdout: str) -> dict[str, str | float]:
@@ -52,7 +85,9 @@ def _parse_3mf_gcode_metadata(output_path: Path) -> dict[str, str | float]:
     if time_match:
         info["estimated_print_time"] = time_match.group(2).strip()
 
-    grams_match = re.search(r";\s*filament used \[g\]\s*=\s*([\d.]+)", gcode, re.IGNORECASE)
+    grams_match = re.search(
+        r";\s*(?:filament used|total filament weight) \[g\]\s*[:=]\s*([\d.]+)", gcode, re.IGNORECASE
+    )
     if grams_match:
         info["estimated_filament_g"] = float(grams_match.group(1))
         return info
@@ -99,7 +134,12 @@ def _extract_3mf_thumbnail(output_path: Path) -> Path | None:
                 return None
             source_name = sorted(
                 candidates,
-                key=lambda value: ("thumbnail" not in value.lower(), value),
+                # Bambu pick/top images are masks or alternate views, not thumbnails.
+                key=lambda value: (
+                    value != "Metadata/plate_1.png",
+                    "thumbnail" not in value.lower(),
+                    value,
+                ),
             )[0]
             suffix = Path(source_name).suffix or ".png"
             destination = output_path.with_suffix(f".thumbnail{suffix}")
@@ -244,6 +284,9 @@ def _slice_sync(
     output_path: Path,
     settings: Settings,
 ) -> SliceResult:
+    binary = binary.resolve()
+    model_path = model_path.resolve()
+    output_path = output_path.resolve()
     machine, process, filament = _resolve_profile_files(settings)
     machine, process, filament = flatten_profiles(
         (machine, process, filament),
@@ -253,6 +296,10 @@ def _slice_sync(
 
     cmd = [
         str(binary),
+        # The A1 printer payload uses textured_plate. Set the slicer explicitly:
+        # default_bed_type in a machine preset does not select the active plate.
+        "--curr-bed-type",
+        "Textured PEI Plate",
         "--arrange",
         "1",
         "--orient",
@@ -268,14 +315,21 @@ def _slice_sync(
         str(model_path),
     ]
 
+    # An unsuccessful rerun must never leave a previous slice looking current.
+    output_path.unlink(missing_ok=True)
+    (output_path.parent / "slicer-command.json").write_text(
+        json.dumps(cmd, indent=2) + "\n", encoding="utf-8"
+    )
     proc = __import__("subprocess").run(
         cmd,
         capture_output=True,
+        cwd=str(output_path.parent),
         text=True,
         check=False,
         timeout=600,
     )
     combined = f"{proc.stdout}\n{proc.stderr}"
+    (output_path.parent / "slicer.log").write_text(combined, encoding="utf-8")
     if proc.returncode < 0:
         raise SliceError(
             f"{binary.name} crashed with signal {-proc.returncode}; no slice was produced",
@@ -292,7 +346,9 @@ def _slice_sync(
     if not output_path.is_file():
         raise SliceError("OrcaSlicer finished without producing a .3mf file")
 
+    validate_sliced_archive(output_path, expected_bed_type="Textured PEI Plate")
     _patch_3mf_filament_metadata(output_path, use_ams=settings.use_ams)
+    validate_sliced_archive(output_path, expected_bed_type="Textured PEI Plate")
     meta = _parse_slice_output(combined)
     meta.update({k: v for k, v in _parse_3mf_gcode_metadata(output_path).items() if v})
     thumbnail_path = _extract_3mf_thumbnail(output_path)

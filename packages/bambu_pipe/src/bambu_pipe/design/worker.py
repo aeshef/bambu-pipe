@@ -10,6 +10,16 @@ from pathlib import Path
 from bambu_pipe.design.schema import DesignSpec
 
 
+def remove_zero_area_faces(mesh) -> int:  # noqa: ANN001
+    """Discard empty tessellation artifacts; never fill holes or move vertices."""
+    keep = mesh.area_faces > 0
+    removed = int((~keep).sum())
+    if removed:
+        mesh.update_faces(keep)
+        mesh.remove_unreferenced_vertices()
+    return removed
+
+
 def main() -> None:
     import cadquery as cq
     import numpy as np
@@ -58,7 +68,6 @@ def main() -> None:
     }
     cq.exporters.export(shape, str(output / "model.step"))
     cq.exporters.export(shape, str(output / "model.stl"), tolerance=0.05, angularTolerance=0.1)
-    (output / "metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
     mesh = trimesh.load(output / "model.stl", force="mesh", process=True)
     if (
         not isinstance(mesh, trimesh.Trimesh)
@@ -66,6 +75,15 @@ def main() -> None:
         or not np.isfinite(mesh.vertices).all()
     ):
         raise ValueError("CAD export is empty or has non-finite coordinates")
+    # OCC can emit collapsed triangles at sphere poles and rounded corners.
+    # They have no surface area but otherwise make a closed STL fail topology checks.
+    removed = remove_zero_area_faces(mesh)
+    if not len(mesh.faces):
+        raise ValueError("CAD export has no positive-area faces")
+    if removed:
+        mesh.export(output / "model.stl")
+    metrics["stl_zero_area_faces_removed"] = removed
+    (output / "metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
     render_views(mesh, output)
 
 

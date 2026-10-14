@@ -74,3 +74,46 @@ Some installed macOS Bambu Studio builds fail in their GUI plate initialization
 even for a small STL passed through the CLI. Use a working headless slicer binary
 via `BAMBU_PIPE_SLICER_BINARY` when this occurs. CAD export and review remain
 independent of the slicer; do not claim slicing passed after such a failure.
+
+### Local slice handoff checks
+
+The current A1 sender uses a textured PEI plate. Slicing explicitly selects
+`Textured PEI Plate` and checks the exported `curr_bed_type` against that choice.
+A machine preset's `default_bed_type` alone does not select the active plate in
+the CLI: a real test otherwise produced Cool Plate G-code at 35 °C. Other plate
+types require matching changes to both slicing and the printer command.
+
+A successful subprocess is not sufficient. The adapter checks the ZIP CRCs,
+requires exactly `Metadata/plate_1.gcode` (the path used by the sender), rejects
+G-code without extrusion moves, and verifies the plate setting. It removes a
+previous destination before a new attempt and saves `slicer-command.json`,
+`slicer.log`, and flattened profiles next to each result. These are file-format
+and handoff checks, not proof of print quality. Bambu's native plate thumbnail
+is preferred over object-selection masks. Print weight parsing supports Bambu
+Studio's `total filament weight [g]` header.
+
+On macOS, `~/Applications/BambuStudio.app` is discovered before the system Bambu
+Studio copy. On 2026-10-14, Bambu Studio **02.08.02.61** completed real slicing
+through `verify_design` and the public `BambuPipeline.slice_model` API:
+
+| Reviewed design | Layer | Layers | Estimated time | Estimated PLA |
+| --- | --- | --- | --- | --- |
+| Moon Gardener | 0.16 mm | 787 | 4h 20m 32s | 81.35 g |
+| Orbital Bloom | 0.20 mm | 890 | 6h 19m 33s | 147.46 g |
+
+Both used A1 / 0.4 mm / Generic PLA / textured PEI at 65 °C. The figure used
+build-plate tree supports; the vase used no supports. Actual G1/G2/G3 paths were
+inspected, including the vase's roughly 34 mm reservoir bridge. Archive CRCs,
+embedded G-code MD5, source and archive SHA-256, extrusion bounds, and the local
+send payload were checked. The normal bundled profiles also sliced a 10 mm
+cube successfully. Local evidence is in
+`output/fun-suite-2026-10-14/print-ready/` (generated artifacts are not committed).
+
+Both jobs stopped at `awaiting_slice_approval`. Upload, MQTT device acceptance,
+physical printing, support removal, bridge sag and water tightness remain
+untested. See the [official CLI documentation](https://github.com/bambulab/BambuStudio/wiki/Command-Line-Usage)
+and [tested Bambu Studio release](https://github.com/bambulab/BambuStudio/releases/tag/v02.08.02.61).
+
+### Rounded-surface STL export
+
+OpenCascade may tessellate sphere poles or rounded corners into triangles of exactly zero area. The CAD worker removes only those empty triangles before saving the final STL and records `stl_zero_area_faces_removed` in its metrics. It never fills holes, moves vertices, or removes small positive-area triangles. The final saved STL still has to pass the usual topology and size checks.
