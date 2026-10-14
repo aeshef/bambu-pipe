@@ -24,7 +24,8 @@ def test_real_holes_and_small_positive_faces_are_preserved() -> None:
     assert not mesh.is_watertight
     tiny = trimesh.Trimesh(
         vertices=[[0, 0, 0], [1e-6, 0, 0], [0, 1e-6, 0]],
-        faces=[[0, 1, 2]], process=False,
+        faces=[[0, 1, 2]],
+        process=False,
     )
     assert remove_zero_area_faces(tiny) == 0
     assert len(tiny.faces) == 1

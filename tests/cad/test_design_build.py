@@ -222,13 +222,12 @@ def test_slice_handoff_uses_verified_stl_without_printing(workspace, monkeypatch
     assert json.loads(result.stdout)["stage"] == "awaiting_slice_approval"
 
 
-
 def test_round_solid_stl_retains_closed_surface(tmp_path) -> None:  # noqa: ANN001
     import trimesh
 
     workspace = init_design(tmp_path / "sphere")
     (workspace / "model.py").write_text(
-        'import cadquery as cq\ndef build(p):\n'
+        "import cadquery as cq\ndef build(p):\n"
         '    return cq.Workplane("XY").sphere(10).translate((0,0,10))\n'
     )
     spec = {
@@ -242,4 +241,4 @@ def test_round_solid_stl_retains_closed_surface(tmp_path) -> None:  # noqa: ANN0
     assert report["passed"]
     mesh = trimesh.load(Path(report["output_dir"]) / "model.stl", force="mesh")
     assert mesh.is_watertight and mesh.is_volume
-    assert mesh.volume == pytest.approx(4 / 3 * math.pi * 10**3, rel=.005)
+    assert mesh.volume == pytest.approx(4 / 3 * math.pi * 10**3, rel=0.005)
