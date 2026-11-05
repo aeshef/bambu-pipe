@@ -20,7 +20,7 @@ pip install -e 'packages/bambu_pipe[dev]'
 
 For CAD or rendering changes, install `'packages/bambu_pipe[cad-dev]'` instead.
 The CAD extra downloads native libraries; the first install is larger.
-Windows activation is `.venv\Scripts\Activate.ps1` in PowerShell.
+Windows activation is `.venv\Scripts\Activate.ps1` in PowerShell; see the [Windows PowerShell CAD quickstart](docs/windows-powershell-cad-quickstart.md) for the full Windows setup, desk-hook reproduction, and troubleshooting.
 No printer, provider account or graphical CAD application is required.
 
 ## Make a focused pull request

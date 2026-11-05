@@ -58,6 +58,8 @@ bambu-pipe design doctor
 bambu-pipe design install-skill --target .agents/skills
 ```
 
+On Windows PowerShell, follow the [Windows PowerShell CAD quickstart](docs/windows-powershell-cad-quickstart.md) instead of the `bash` block above.
+
 Open this folder in Codex and use `$bambu-design`, for example:
 
 > $bambu-design Read examples/cad/desk-hook/brief.md. Design the part from the
